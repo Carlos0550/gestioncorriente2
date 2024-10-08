@@ -1,24 +1,27 @@
-import logo from './logo.svg';
+import React from 'react';
+import { Route, Routes, Navigate } from 'react-router-dom';
+import Dashboard from './componentes/Dashboard/Dashboard';
 import './App.css';
+import { SignedIn, SignedOut } from '@clerk/clerk-react';
+import Login from './componentes/Inicio de sesion/Login';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Routes>
+      <Route path='/' element={<Login />} />
+      <Route
+        path='/dashboard'
+        element={
+          <SignedIn>
+            <Dashboard />
+          </SignedIn>
+        }
+      />
+      <Route
+        path='*'
+        element={<Navigate to="/" replace />} // Redirige cualquier ruta no encontrada a Login
+      />
+    </Routes>
   );
 }
 
