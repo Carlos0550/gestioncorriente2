@@ -1,63 +1,96 @@
-import React from 'react'
-import { Row,Col, Table, Card } from "antd"
+import React, { useState } from 'react'
+import { Row,Col, Table, Card, Popconfirm } from "antd"
 import "./dashboard.css"
-import Navbar from './Navbar/Navbar'
-import { structureTable } from '../Estructuras de ejemplo/UsuariosConAcceso'
+import Navbar from '../Navbar/Navbar'
 import { totalAccountsToPay } from '../Estructuras de ejemplo/TotalCuentasCobrar'
 import { pagosRecientesEstructura } from '../Estructuras de ejemplo/PagosRecientes'
+import { useNavigate } from 'react-router-dom'
+import { useAppContext } from '../../context/AppContext'
+import { Button, Space, Switch } from "antd";
+import { DeleteOutlined } from "@ant-design/icons";
+
 function Dashboard() {
-    const dataAccesUsers = [
-        {
-            key: 1,
-            name: 'John Brown',
-            age: 32,
-            address: 'New York No. 1 Lake Park',
-        }
-    ]
 
-    const dataUsersToPay = [
+    const navigate = useNavigate()
+    const { listaUsuarios, deleteUser } = useAppContext()
+    
+    const orderedUsers = listaUsuarios
+    .sort((a,b)=> a.id - b.id)
+    const [deletingUser, setDeletingUser] = useState(false)
+    const handleDeleteUser = async(id) => {
+        setDeletingUser(true)
+        await deleteUser(id)
+        setDeletingUser(false)
+    }
+ 
+    const usersStructureTable = [
+        
         {
             key: 1,
-            nombre: 'John Brown',
-            adeuda: "15000", 
+            title: "Usuario",
+            render: (_,record) => (
+                <p>{record.username}</p>
+            )
         },
         {
-            key: 1,
-            nombre: 'John Brown',
-            adeuda: "15000", 
-        },{
-            key: 1,
-            nombre: 'John Brown',
-            adeuda: "15000", 
-        },{
-            key: 1,
-            nombre: 'John Brown',
-            adeuda: "15000", 
-        },{
-            key: 1,
-            nombre: 'John Brown',
-            adeuda: "15000", 
-        }
-    ]
-
-    const recentlyPays = [
-        {
-            key: 1,
-            nombre: 'John Brown',
-            monto: "15000", 
-            fecha: "2022-01-01",
+            key: 2,
+            title: "Permisos",
+            render: (_, record) => (
+                <>
+                    {record.administrador ? <Space>
+                        <ul>
+                            <li>Agregar, editar, eliminar y contactar clientes</li>
+                            <li>Ver reportes</li>
+                            <li>Administrar usuarios</li>
+                            <li>Administrar Ajustes</li>
+                            <li>Administrar Cuentas Corrientes. </li>
+                            <li>Administrar Pagos.</li>
+                            <li>Ver deudas.</li>
+                        </ul>
+                    </Space> : null}
+                    {record.administrador === false && record.autorizado ? <Space>
+                        <ul>
+                            <li>Listar, agregar, editar clientes</li>
+                            <li>Añadir Deudas</li>
+                            <li>Gestionar pagos</li>
+                            <li>Revisar Historial</li>
+                        </ul>
+                    </Space> : null}
+                    {record.administrador === false && record.autorizado === false ? <strong>Usuario no autorizado</strong> : null}
+                </>
+            )
         },
         {
-            key: 1,
-            nombre: 'John Brown',
-            monto: "15000", 
-            fecha: "2022-01-01",
-        },
-        {
-            key: 1,
-            nombre: 'John Brown',
-            monto: "15000", 
-            fecha: "2022-01-01",
+            key: 3,
+            title: "Avatar",
+            render: (_, record) => (
+                <picture className="user__image-container"><img src={record.userimage} alt="" /></picture>
+            )
+        },{
+            key: 4,
+            title: "Acciones",
+            render: (_, record) => (
+                <>
+                    <Space direction='vertical'>
+                        <Space >
+                            {record.administrador ? "Quitar Administrador" : "Hacer administrador"} <Switch checked={record.administrador}/>
+                        </Space>
+                        <Space>
+                            {record.autorizado ? "Quitar Acceso" : "Conceder Acceso"} <Switch checked={record.autorizado}/>
+                        </Space>
+                        <Popconfirm
+                        title="¿Estás seguro de eliminar este usuario?"
+                        description="Si es administrador, perderá el acceso al sistema. asegurese de tener otro usuario como administrador."
+                        onConfirm={() => handleDeleteUser(record.id)}
+                        okText="Si, eliminar"
+                        cancelText="Cancelar"
+                        okButtonProps={{ loading: deletingUser }}
+                        >
+                            <Button type="primary" danger>Eliminar Usuario <DeleteOutlined/></Button>
+                        </Popconfirm>
+                    </Space>
+                </>
+            )
         }
     ]
     
@@ -70,17 +103,17 @@ function Dashboard() {
             <Row gutter={[16, 16]}>
                 <Col sx={24} sm={24} md={12} lg={14}>
                     <Card title="Usuarios con acceso">
-                        <Table columns={structureTable} dataSource={dataAccesUsers} style={{minWidth: "100%"}} pagination={{pageSize: 5}}/>
+                        <Table columns={usersStructureTable} dataSource={orderedUsers} style={{minWidth: "100%"}} pagination={{pageSize: 5}} scroll={{x: 800}}/>
                     </Card>
                 </Col>
                 <Col sx={24} md={12} lg={10}>
                     <Card title="Pagos recientes">
-                        <Table columns={pagosRecientesEstructura} dataSource={recentlyPays} style={{minWidth: "100%"}} pagination={{pageSize: 5}}/>
+                        <Table columns={pagosRecientesEstructura}  style={{minWidth: "100%"}} pagination={{pageSize: 5}}/>
                     </Card>
                 </Col>
                 <Col sx={24} sm={24} md={12} lg={14}>
                     <Card title="Vencimientos del mes">
-                        <Table columns={totalAccountsToPay} dataSource={dataUsersToPay} style={{minWidth: "100%"}} pagination={{pageSize: 4}}/>
+                        <Table columns={totalAccountsToPay}  style={{minWidth: "100%"}} pagination={{pageSize: 4}}/>
                     </Card>
                 </Col>
                 
