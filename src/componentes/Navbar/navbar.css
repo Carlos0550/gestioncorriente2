@@ -1,0 +1,81 @@
+.navbar{
+    background-color: black;
+    min-height: 30px;
+    max-height: 70px;
+    height: 100%;
+    display: flex;
+
+}
+.nav-pc{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.nav-pc__links{
+    color: white;
+    display: flex;
+    padding: 0 1rem;
+    gap: 1rem;
+    list-style: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem
+}
+
+.user__info{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: .5rem;
+    gap: 1rem;
+}
+
+.user__name{
+    color: white;
+    font-size: 1.3rem;
+    font-weight: 600
+}
+
+.user__image{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    max-width: 60px;
+    aspect-ratio: 1/1;
+    border-radius: 1rem;
+    overflow: hidden;
+}
+
+.user__image img{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.nav-pc__li{
+    transition: all 300ms ease-in-out;
+}
+
+.nav-pc__li:hover{
+    cursor: pointer;
+    color: #ccc;
+    text-decoration: underline;
+    text-decoration-color: rgb(128, 0, 0);
+}
+.logout__button{
+    border: none;
+    padding: .5rem;
+    border-radius: .75rem;
+    background-color: red;
+    color: white;
+    transition: all 300ms ease-in-out;
+}
+
+.logout__button:hover{
+    cursor: pointer;
+    background-color: rgb(255, 0, 0);
+    transform: translateY(-3px);
+}
