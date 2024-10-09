@@ -4,6 +4,7 @@ import Dashboard from './componentes/Dashboard/Dashboard';
 import './App.css';
 import { SignedIn, SignedOut } from '@clerk/clerk-react';
 import Login from './componentes/Inicio de sesion/Login';
+import ClientsManager from './componentes/AdministrarClientes/ClientsManager';
 
 function App() {
   return (
@@ -17,9 +18,18 @@ function App() {
           </SignedIn>
         }
       />
+
+      <Route
+        path='/clientes'
+        element={
+          <SignedIn>
+            <ClientsManager />
+          </SignedIn>
+        }
+      />
       <Route
         path='*'
-        element={<Navigate to="/" replace />} // Redirige cualquier ruta no encontrada a Login
+        element={<Navigate to="/" replace />}
       />
     </Routes>
   );
