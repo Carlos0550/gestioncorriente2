@@ -65,6 +65,11 @@
     text-decoration: underline;
     text-decoration-color: rgb(128, 0, 0);
 }
+
+.nav-pc__li.active{
+    text-decoration: underline;
+    text-decoration-color: rgb(128, 0, 0);
+}
 .logout__button{
     border: none;
     padding: .5rem;
