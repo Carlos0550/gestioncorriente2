@@ -1,0 +1,16 @@
+.highlight {
+    animation: highlight-animation 1s ease-in-out;
+  }
+  
+  @keyframes highlight-animation {
+    0% {
+      background-color: #ffffcc; /* Color de fondo inicial */
+    }
+    50% {
+      background-color: #ffeb3b; /* Color de fondo intermedio */
+    }
+    100% {
+      background-color: transparent; /* Color de fondo final */
+    }
+  }
+  
