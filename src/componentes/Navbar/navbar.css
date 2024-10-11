@@ -68,7 +68,9 @@
 
 .nav-pc__li.active{
     text-decoration: underline;
-    text-decoration-color: rgb(128, 0, 0);
+    color: #ffffff;
+
+    text-decoration-color: rgb(128, 109, 0);
 }
 .logout__button{
     border: none;
