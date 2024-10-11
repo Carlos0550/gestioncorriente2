@@ -1,0 +1,26 @@
+.how-insert-debts-modal {
+    max-width: 600px; 
+  }
+  
+  .how-insert-debts-content {
+    font-family: Arial, sans-serif; 
+    line-height: 1.6; 
+  }
+  
+  .how-insert-debts-content h2 {
+    color: #ff1818; 
+    margin-bottom: 10px; 
+  }
+  
+  .how-insert-debts-content p,
+  .how-insert-debts-content li {
+    margin: 5px 0; 
+  }
+  
+  .how-insert-debts-content pre {
+    background-color: #f0f0f0; 
+    padding: 10px; 
+    border-radius: 5px; 
+    overflow-x: auto; 
+  }
+  
