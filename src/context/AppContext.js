@@ -4,6 +4,8 @@ import { useAuth, useUser } from "@clerk/clerk-react";
 import { useNavigate } from "react-router-dom";
 import { message, notification } from "antd";
 import { baseUrl } from "../config";
+import { v4 as uuidv4 } from "uuid"
+import dayjs from "dayjs";
 const AppContext = createContext();
 
 export const useAppContext = () => {
@@ -25,6 +27,25 @@ export const AppContextProvider = ({ children }) => {
     const [listaUsuarios, setListaUsuarios] = useState([]);
     const [nonAuthorized, setNonAuthorized] = useState(false);
     const [currentUser, setCurrentUser] = useState([])
+    const [clients, setClients] = useState([])
+    const [searchText, setSearchText] = useState("")
+
+    const orderedClients = clients
+        .sort((a, b) => a.id - b.id)
+        .filter((client) => {
+            const searchClient = client?.nombre_completo.toLowerCase().includes(searchText.toLowerCase())
+            const searchDni = client?.dni?.toString().includes(searchText.toLowerCase())
+            return searchClient || searchDni
+        })
+
+    const capitaliceStrings = (text) => {
+        const words = text.split(" ")
+        const capitalicedWords = words.map((word) => {
+            return word.charAt(0).toUpperCase() + word.slice(1)
+        })
+
+        return capitalicedWords.join(" ")
+    }
     const verifyUser = async () => {
         const formData = new FormData();
         const data = {
@@ -130,7 +151,7 @@ export const AppContextProvider = ({ children }) => {
         }
     }
 
-    const grantOrDenyAccess = async(id) => {
+    const grantOrDenyAccess = async (id) => {
         const hiddenMessage = message.loading("Guardando...", 0)
         if (!id) {
             message.error("No se encontro el usuario")
@@ -154,13 +175,13 @@ export const AppContextProvider = ({ children }) => {
                 })
                 setListaUsuarios(newUsers)
                 message.success(`Acceso actualizado`)
-            }else{
+            } else {
                 message.error("Error al actualizar el acceso")
             }
         } catch (error) {
             console.log(error)
             message.error("Error de conexion o de servidor al actualizar el acceso")
-        }finally{
+        } finally {
             hiddenMessage()
         }
     };
@@ -172,8 +193,9 @@ export const AppContextProvider = ({ children }) => {
             if (!data.userDni || !data.userName) {
                 throw new Error("No es posible crear el cliente, faltan datos!")
             }
+
             for (const key in data) {
-                formData.append(key, data[key]);
+                formData.append(key, data[key] ?? "");
             }
             const response = await fetch(`${baseUrl.api}/save-client`, {
                 method: "POST",
@@ -182,7 +204,7 @@ export const AppContextProvider = ({ children }) => {
             if (!response.ok) {
                 throw new Error("Error al crear el cliente");
             }
-    
+
             const responseData = await response.json();
             await getAllClients()
             notification.success({
@@ -203,8 +225,8 @@ export const AppContextProvider = ({ children }) => {
             hiddenMessage();
         }
     };
-    const [clients, setClients] = useState([])
-    const getAllClients = async()=> {
+
+    const getAllClients = async () => {
         const hiddenMessage = message.loading("Cargando...", 0);
         try {
             const response = await fetch(`${baseUrl.api}/get-all-clients`);
@@ -222,13 +244,13 @@ export const AppContextProvider = ({ children }) => {
                 placement: "topRight",
                 duration: 5
             })
-        }finally{
+        } finally {
             hiddenMessage()
         }
     }
 
-    const editClient = async(clientValues, clientId) => {
-        const hiddenMessage = message.loading("Actualizando cliente...",0)
+    const editClient = async (clientValues, clientId) => {
+        const hiddenMessage = message.loading("Actualizando cliente...", 0)
         const formData = new FormData();
         if (!clientId) {
             notification.error({
@@ -240,11 +262,11 @@ export const AppContextProvider = ({ children }) => {
             return;
         }
         for (const key of Object.keys(clientValues)) {
-            formData.append(key, clientValues[key])
+            formData.append(key, clientValues[key] ?? "")
         }
 
         try {
-            const response = await fetch(`${baseUrl.api}/edit-client/${clientId}`,{
+            const response = await fetch(`${baseUrl.api}/edit-client/${clientId}`, {
                 method: "PUT",
                 body: formData
             });
@@ -253,7 +275,7 @@ export const AppContextProvider = ({ children }) => {
                 const data = await response.json();
                 console.log(data)
                 throw new Error(`${data.message}`);
-            }else{
+            } else {
                 await getAllClients()
                 notification.success({
                     message: "Se actualizo el cliente",
@@ -270,11 +292,84 @@ export const AppContextProvider = ({ children }) => {
                 placement: "topRight",
                 duration: 5
             })
+        } finally {
+            hiddenMessage()
+        }
+    }
+
+    const deleteClient = (clientId) => {
+        const hiddenMessage = message.loading("Eliminando cliente...", 0)
+        try {
+            fetch(`${baseUrl.api}/delete-client/${clientId}`, {
+                method: "DELETE"
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    notification.success({
+                        message: "Se elimino el cliente",
+                        description: data.message,
+                        placement: "topRight",
+                        duration: 3,
+                        showProgress: true
+                    })
+                    getAllClients()
+                })
+        } catch (error) {
+            console.log(error)
+            notification.error({
+                message: "Error al eliminar el cliente",
+                description: error.message,
+                placement: "topRight",
+                duration: 5
+            })
+        } finally {
+            hiddenMessage()
+        }
+    }
+
+    const saveClientDebt = async(debts, buyDate, debtId, clientId) => {
+        const hiddenMessage = message.loading("Guardando...", 0)
+        const formData = new FormData();
+        formData.append("productos", JSON.stringify(debts));
+        formData.append("buyDate", buyDate);
+        formData.append("expDate", dayjs(buyDate).add(1, "month"));
+        formData.append("clientDebtId", debtId)
+        // depuracion de valores
+        // for (const [key, value] of formData.entries()) {
+        //     console.log("key: ", key, "value: ", value);
+        // }
+
+        try {
+            const response = await fetch(`${baseUrl.api}/save-client-debt/${clientId}`, {
+                method:"POST",
+                body: formData
+            })
+            const data = await response.json()
+            if (!response.ok) {
+                
+                throw new Error(`${data.message}`);
+            }
+            notification.success({
+                message: "Deuda guardada exitosamente",
+                description: data.message,
+                placement: "topRight",
+                duration: 7,
+                showProgress: true
+            })
+        } catch (error) {
+            console.log(error)
+            notification.error({
+                message: "Error al guardar el producto",
+                description: error.message,
+                placement: "topRight",
+                duration: 5,
+                showProgress: true
+            })
         }finally{
             hiddenMessage()
         }
-    } 
-    
+    }
+
 
     useEffect(() => {
         if (user) {
@@ -302,8 +397,9 @@ export const AppContextProvider = ({ children }) => {
     return (
         <AppContext.Provider value={{
             administrator, authorized, listaUsuarios, nonAuthorized,
-            deleteUser, currentUser,grantOrDenyAccess, saveClient,
-            clients,editClient
+            deleteUser, currentUser, grantOrDenyAccess, saveClient,
+            clients, editClient, deleteClient, setSearchText,
+            orderedClients,capitaliceStrings,uuidv4,saveClientDebt
         }}
         >
             {contextHolder}
