@@ -39,7 +39,7 @@ function Navbar() {
                     >
                         Clientes
                     </li>
-                    <li className='nav-pc__li'>Cuentas C.</li>
+                    <li onClick={()=> navigate("/cuentas-corrientes")} className={location.pathname==="/cuentas-corrientes/*" ? 'nav-pc__li active' : 'nav-pc__li'}>Cuentas C.</li>
                     <li className='nav-pc__li'>Pagos</li>
                     <li className='nav-pc__li'>Vencimientos</li>
                     {currentUser?.administrador && (
