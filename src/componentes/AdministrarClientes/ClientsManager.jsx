@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import Navbar from '../Navbar/Navbar'
-import { Card, Col, Row, Form, Input, Table, Button, Space, Flex } from 'antd'
+import { Card, Col, Row, Form, Input, Table, Button, Space, Flex, Popconfirm } from 'antd'
 import { useAppContext } from '../../context/AppContext'
-import { DeleteOutlined, EditOutlined, IdcardOutlined, UserAddOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, UserAddOutlined } from '@ant-design/icons'
 import Search from 'antd/es/transfer/search'
 import { scroller } from "react-scroll"
 import "./clientsManager.css"
 function ClientsManager() {
-  const { saveClient, clients,editClient } = useAppContext()
+  const { saveClient, clients,editClient,deleteClient, orderedClients, setSearchText,capitaliceStrings } = useAppContext()
   const [formClients] = Form.useForm()
   const [savingClient, setSavingClient] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -36,27 +36,28 @@ function ClientsManager() {
       setHighlighted(false);
     }, 1000);
   };
+
+  const [deletingClient, setDeletingClient] = useState(false)
+  const handleDeleteClient = async(clienId) => {
+    setDeletingClient(true)
+    deleteClient(clienId)
+    setDeletingClient(false)
+  }
+
   useEffect(() => {
     if (isEditing) {
       formClients.setFieldsValue({
         userName: selectedClient.nombre_completo,
-        userEmail: selectedClient.email,
+        userEmail: selectedClient.email || "",
         userDni: selectedClient.dni,
-        userPhone: selectedClient.telefono
+        userPhone: selectedClient.telefono || ""
       })
     }else{
       formClients.resetFields()
     }
   }, [isEditing, selectedClient])
 
-  const capitaliceStrings = (text) => {
-    const words = text.split(" ")
-    const capitalicedWords = words.map((word) => {
-      return word.charAt(0).toUpperCase() + word.slice(1)
-    })
-
-    return capitalicedWords.join(" ")
-  }
+ 
   const clientsColumns = [
     {
       key: 1,
@@ -96,13 +97,22 @@ function ClientsManager() {
       render: (_, record) => (
         <>
           <Flex gap={2}>
-            <Space direction='vertical'>
+            <Space>
               <Button type='primary' onClick={() => handleEditClient(record.id)}><EditOutlined /></Button>
-              <Button type='primary' danger><DeleteOutlined /></Button>
+              <Popconfirm
+                title="Esté seguro que desea eliminar este cliente?"
+                description="Esto eliminará permanentemente historial, entregas y deudas!"
+                okText="Si, eliminar!"
+                cancelText="Cancelar"
+                onConfirm={() => handleDeleteClient(record.id)}
+                okButtonProps={{ loading: deletingClient }}
+              >
+                <Button type='primary' danger><DeleteOutlined /></Button>
+              </Popconfirm>
             </Space>
-            <Space direction='vertical'>
+            {/* <Space direction='vertical'>
               <Button type='primary'><IdcardOutlined /></Button>
-            </Space>
+            </Space> */}
           </Flex>
         </>
 
@@ -110,14 +120,7 @@ function ClientsManager() {
     }
   ]
 
-  const [searchText, setSearchText] = useState("")
-  const orderedClients = clients
-    .sort((a, b) => a.id - b.id)
-    .filter((client) => {
-      const searchClient = client?.nombre_completo.toLowerCase().includes(searchText.toLowerCase())
-      const searchDni = client?.dni?.toString().includes(searchText.toLowerCase())
-      return searchClient || searchDni
-    })
+  
 
 
   return (
@@ -168,9 +171,9 @@ function ClientsManager() {
                       { required: true, message: "Por favor ingrese el DNI" },
                       {
                         validator: (_, value) => {
-                          const regex = new RegExp("^[0-9]{6,9}$")
+                          const regex = new RegExp("^[0-9A-Z]{6,9}$")
                           if (!regex.test(value)) {
-                            return Promise.reject(new Error("El DNI debe tener entre 6 y 9 caracteres."))
+                            return Promise.reject(new Error("El DNI solo puede contener letras MAYUSCULAS y/o y números."))
                           }
                           return Promise.resolve()
                         }
@@ -193,13 +196,7 @@ function ClientsManager() {
                     label="Teléfono de contácto"
                     rules={[
                       {
-                        validator: (_, value) => {
-                          const regex = new RegExp("^[0-9]{0,}$")
-                          if (!regex.test(value)) {
-                            return Promise.reject(new Error("El teléfono no es válido"))
-                          }
-                          return Promise.resolve()
-                        }
+                        type: "number", message: "Ingrese un número valido"
                       }
                     ]}
                   >
