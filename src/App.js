@@ -5,6 +5,7 @@ import './App.css';
 import { SignedIn, SignedOut } from '@clerk/clerk-react';
 import Login from './componentes/Inicio de sesion/Login';
 import ClientsManager from './componentes/AdministrarClientes/ClientsManager';
+import CurrentAccManager from './componentes/Cuentas Corrientes/CurrentAccManager';
 
 function App() {
   return (
@@ -24,6 +25,15 @@ function App() {
         element={
           <SignedIn>
             <ClientsManager />
+          </SignedIn>
+        }
+      />
+
+      <Route
+        path='/cuentas-corrientes/*'
+        element={
+          <SignedIn>
+            <CurrentAccManager />
           </SignedIn>
         }
       />
