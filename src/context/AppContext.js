@@ -39,6 +39,7 @@ export const AppContextProvider = ({ children }) => {
         })
 
     const capitaliceStrings = (text) => {
+        if (!text) return text;
         const words = text.split(" ")
         const capitalicedWords = words.map((word) => {
             return word.charAt(0).toUpperCase() + word.slice(1)
@@ -327,7 +328,77 @@ export const AppContextProvider = ({ children }) => {
         }
     }
 
-    const saveClientDebt = async(debts, buyDate, debtId, clientId) => {
+    const [client, setClient] = useState([]);
+    const [processedDebts, setProcessedDebts] = useState([]);
+
+    const getClientFile = async (clientId) => {
+        setProcessedDebts([])
+        setClient([])
+        const hiddenMessage = message.loading("Un momento...", 0)
+        setTimeout(async() => {
+            try {
+                const response = await fetch(`${baseUrl.api}/get-client-file/${clientId}`);
+                if (!response.ok) {
+                    throw new Error("Error obteniendo los datos del cliente");
+                }
+                const data = await response.json()
+                console.log("Datos obtenidos",data)
+                setClient(data)
+                message.success(`Fichero de ${capitaliceStrings(data?.nombre_cliente)} obtenidos!`)
+            } catch (error) {
+                console.log(error)
+                notification.error({
+                    message: "Error al obtener el cliente",
+                    description: error.message,
+                    placement: "topRight",
+                    duration: 3,
+                    showProgress: true
+                })
+                navigate("/cuentas-corrientes")
+            } finally {
+                hiddenMessage()
+            }
+        }, 1000);
+    }
+
+    const processDebts = (debts) => {
+        if (debts && debts.length > 0) {
+            const clientFile = debts.map((debt) => {
+                const products = debt.detalles.map((prod) => {
+                    const productArray = prod.split(" ");
+                    const productQuantity = productArray[0]; 
+                    const productPrice = parseFloat(productArray[productArray.length - 1]); 
+    
+                    const productName = productArray.slice(1, productArray.length - 1).join(" ");
+    
+                    return {
+                        cantidad: productQuantity,
+                        nombre: productName,
+                        precio: productPrice
+                    };
+                });
+    
+                return {
+                    id: debt.id,
+                    clienteId: debt.cliente_id,
+                    productos: products,
+                    fechaCompra: debt.fecha_compra,
+                    fechaVencimiento: debt.fecha_vencimiento,
+                    estado: debt.estado ? "Al día" : "Pendiente" 
+                };
+            });
+    
+            setProcessedDebts(clientFile);
+        }
+        return [];
+    };
+
+    useEffect(() => {
+        if (client) {
+            processDebts(client.deudas)
+        }
+    }, [client])
+    const saveClientDebt = async (debts, buyDate, debtId, clientId) => {
         const hiddenMessage = message.loading("Guardando...", 0)
         const formData = new FormData();
         formData.append("productos", JSON.stringify(debts));
@@ -341,12 +412,12 @@ export const AppContextProvider = ({ children }) => {
 
         try {
             const response = await fetch(`${baseUrl.api}/save-client-debt/${clientId}`, {
-                method:"POST",
+                method: "POST",
                 body: formData
             })
             const data = await response.json()
             if (!response.ok) {
-                
+
                 throw new Error(`${data.message}`);
             }
             notification.success({
@@ -365,7 +436,7 @@ export const AppContextProvider = ({ children }) => {
                 duration: 5,
                 showProgress: true
             })
-        }finally{
+        } finally {
             hiddenMessage()
         }
     }
@@ -399,7 +470,8 @@ export const AppContextProvider = ({ children }) => {
             administrator, authorized, listaUsuarios, nonAuthorized,
             deleteUser, currentUser, grantOrDenyAccess, saveClient,
             clients, editClient, deleteClient, setSearchText,
-            orderedClients,capitaliceStrings,uuidv4,saveClientDebt
+            orderedClients, capitaliceStrings, uuidv4, saveClientDebt,
+            getClientFile, client, processDebts,processedDebts
         }}
         >
             {contextHolder}
