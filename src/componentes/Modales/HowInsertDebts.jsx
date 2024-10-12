@@ -25,7 +25,7 @@ function HowInsertDebts({ closeModal }) {
           </li>
           <li><strong>Cantidad</strong>: Un número entero que representa la cantidad del producto.</li>
           <li><strong>Nombre del Producto</strong>: Una descripción del producto que puede incluir letras y espacios, pero <strong>no debe contener números</strong>.</li>
-          <li><strong>Precio</strong>: Un número que puede ser entero o decimal (por ejemplo, "25000" o "25000.50").</li>
+          <li><strong>Precio</strong>: Un número que puede ser entero o decimal (por ejemplo, "25000" o "25000.50"), <strong>El precio debe ser POR UNIDAD</strong>.</li>
         </ul>
         <h3>Ejemplo de Formato Válido</h3>
         <pre>
