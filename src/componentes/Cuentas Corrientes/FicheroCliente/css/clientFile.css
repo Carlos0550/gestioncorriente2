@@ -1,0 +1,5 @@
+.file__client-name{
+    font-size: clamp(1rem,1.5vw + 1rem , 3rem);
+    margin-bottom: .1rem;
+    margin-left: 1rem;
+}
