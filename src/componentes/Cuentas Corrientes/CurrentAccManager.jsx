@@ -2,7 +2,7 @@ import React from 'react'
 import "./currentAccManager.css"
 import Navbar from '../Navbar/Navbar'
 import { Route, Routes } from 'react-router-dom'
-import SearchClients from './SearchClients'
+import SearchClients from './Buscador/SearchClients'
 import ClientFile from './FicheroCliente/ClientFile'
 import { SignedIn } from '@clerk/clerk-react'
 function CurrentAccManager() {
@@ -16,7 +16,7 @@ function CurrentAccManager() {
                         <Route path='/' element={<SignedIn>
                             <SearchClients />
                         </SignedIn>} />
-                        <Route path='/show-debts' element={<SignedIn>
+                        <Route path='/show-file' element={<SignedIn>
                             <ClientFile />
                         </SignedIn>} />
                         <Route path='/show-history/:clientId' element={<h1>Muestra el historial del usuario</h1>} />
