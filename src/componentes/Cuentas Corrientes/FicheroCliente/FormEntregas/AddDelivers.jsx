@@ -9,6 +9,18 @@ function AddDelivers({clientId, editingDeliver = false, selectedDeliver = {}, cl
     const [deliverDate, setDeliverDate] = useState(dayjs().format("YYYY-MM-DD"))
     const { saveClientDeliver, editDeliver } = useAppContext()
     const [savingDeliver, setSavingDeliver] = useState(false)
+    const [width, setWidth] = useState(window.innerWidth)
+    useEffect(()=>{
+        const resize = () => setWidth(window.innerWidth)
+        setTimeout(() => {
+            window.addEventListener("resize", resize)
+        }, 500);
+        return () => window.removeEventListener("resize", resize)
+    },[width])
+
+    useEffect(()=>{
+        console.log(width)
+    },[width])
     const onFinish = async(values) => {
         setSavingDeliver(true)
         const { deliverAmount, deliverDate } = values
@@ -43,6 +55,7 @@ function AddDelivers({clientId, editingDeliver = false, selectedDeliver = {}, cl
     name='deliversForm'
     form={form}
     onFinish={onFinish}
+    layout={width < 1200 ? "vertical" : "horizontal"}
     >
         <Form.Item
         name={"deliverAmount"}
