@@ -194,11 +194,17 @@ function ClientsManager() {
                   <Form.Item
                     name={"userPhone"}
                     label="Teléfono de contácto"
-                    rules={[
-                      {
-                        type: "number", message: "Ingrese un número valido"
+                   rules={[
+                    {
+                      validator: (_, value) => {
+                        const regex = new RegExp("^[0-9]+$")
+                        if (!regex.test(value)) {
+                          return Promise.reject(new Error("El teléfono solo puede contener números."))
+                        }
+                        return Promise.resolve()
                       }
-                    ]}
+                    }
+                   ]}
                   >
                     <Input className={highlighted ? 'highlight' : ''} />
                   </Form.Item>
