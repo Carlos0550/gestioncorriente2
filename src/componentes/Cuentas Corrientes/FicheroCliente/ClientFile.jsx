@@ -113,6 +113,7 @@ function ClientFile() {
         {
             key: 4,
             title: "Detalles",
+            minWidth: 250,
             render: (_, record) => (
                 <>
                     <ul>
@@ -125,6 +126,7 @@ function ClientFile() {
         },
         {
             key: 4,
+            
             title: (
                 <>Saldo total: <span style={{ color: "green" }}>{parseFloat(difference).toLocaleString("es-AR",{style:"currency", currency: "ARS"})}</span></>
             )
@@ -205,7 +207,6 @@ function ClientFile() {
             ) 
         }
     ]
-   console.log(orderedDebts)
     return (
         <>
             <div className="file__wrapper">
@@ -239,9 +240,10 @@ function ClientFile() {
                                     />
                                     <Table
                                         columns={tableColumns}
+                                        className='custom__table-file'
                                         dataSource={orderedDebts}
-                                        pagination={false}
-                                        scroll={{ x: 500 }}
+                                        pagination={{pageSize: 5}}
+                                        
                                         rowKey={record => record.id}
                                     />
                                 </>
@@ -264,8 +266,9 @@ function ClientFile() {
                                     <Table
                                         columns={deliverColumns}
                                         dataSource={processedDelivers}
-                                        pagination={false}
-                                        scroll={{ x: 500 }}
+                                        className='custom__table-file'
+                                        pagination={{pageSize: 5}}
+                                        
                                         rowHoverable={true}
                                         rowKey={record => record.id}
                                     />
