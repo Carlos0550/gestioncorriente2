@@ -1,14 +1,14 @@
 import { Button, DatePicker, Form, notification } from 'antd'
 import TextArea from 'antd/es/input/TextArea'
 import dayjs from 'dayjs'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAppContext } from '../../../../context/AppContext'
 import HowInsertDebts from '../../../Modales/HowInsertDebts'
 import { QuestionCircleFilled } from '@ant-design/icons'
-function AddDebt({ clientId }) {
+function AddDebt({ clientId, editingDebt = false, selectedDebt = {}, closeModal }) {
     const [debtsForm] = Form.useForm()
     const [showHelpDebtModal, setShowHelpDebtModal] = useState(false)
-    const { uuidv4, saveClientDebt, getClientFile } = useAppContext()
+    const { uuidv4, saveClientDebt, getClientFile, editDebt } = useAppContext()
     const [dates, setDates] = useState({
         buyDate: dayjs()
     })
@@ -18,6 +18,19 @@ function AddDebt({ clientId }) {
             buyDate: value
         })
     }
+
+    useEffect(()=>{
+        if (editingDebt) {
+            const products = selectedDebt.productos?.map((prod)=> {
+                return `${prod.cantidad} ${prod.nombre} ${prod.precio}`
+            }).join("\n")
+            debtsForm.setFieldsValue({
+                productName: products,
+                buyDate: dayjs(selectedDebt?.fechaCompra)
+            })
+            setDates(dates.buyDate = dayjs(selectedDebt?.fechaCompra))
+        }
+    },[editingDebt])
 
     const [savingDebt, setSavingDebt] = useState(false)
     const onFinish = async (values) => {
@@ -38,10 +51,12 @@ function AddDebt({ clientId }) {
             }
         }
         setSavingDebt(true)
-        await saveClientDebt(products, dayjs(dates.buyDate).format("YYYY-MM-DD"), uuidv4(), clientId)
-        await getClientFile(clientId)
+        editingDebt ? await editDebt(products, dayjs(dates.buyDate).format("YYYY-MM-DD"), selectedDebt.debtUuid, selectedDebt.clienteId) : await saveClientDebt(products, dayjs(dates.buyDate).format("YYYY-MM-DD"), uuidv4(), clientId)
         setSavingDebt(false)
         debtsForm.resetFields()
+        if (editingDebt) {
+            closeModal()
+        }
     }
     return (
         <>
