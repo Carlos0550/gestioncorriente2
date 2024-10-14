@@ -637,8 +637,9 @@ export const AppContextProvider = ({ children }) => {
                 method: "POST",
                 
             });
-            const data = response.json()
-            if(!response.ok) throw new Error(data.message || "No fue posible cancelar la deuda");
+            const data = await response.json()
+            console.log(data)
+            if(!response.ok) throw new Error(data.message ?? "No fue posible cancelar la deuda");
             await getClientFile(clientId)
             notification.success({
                 message: "Deuda cancelada!",
