@@ -330,7 +330,6 @@ export const AppContextProvider = ({ children }) => {
 
     const [client, setClient] = useState([]);
     const [processedDebts, setProcessedDebts] = useState([]);
-
     const getClientFile = async (clientId) => {
         setProcessedDebts([])
         setClient([])
@@ -342,9 +341,8 @@ export const AppContextProvider = ({ children }) => {
                     throw new Error("Error obteniendo los datos del cliente");
                 }
                 const data = await response.json()
-                console.log("Datos obtenidos",data)
                 setClient(data)
-                message.success(`Fichero de ${capitaliceStrings(data?.nombre_cliente)} obtenidos!`)
+                
             } catch (error) {
                 console.log(error)
                 notification.error({
@@ -358,7 +356,7 @@ export const AppContextProvider = ({ children }) => {
             } finally {
                 hiddenMessage()
             }
-        }, 1000);
+        }, 500);
     }
 
     const processDebts = (debts) => {
@@ -380,6 +378,7 @@ export const AppContextProvider = ({ children }) => {
     
                 return {
                     id: debt.id,
+                    debtUuid: debt.deuda_uuid,
                     clienteId: debt.cliente_id,
                     productos: products,
                     fechaCompra: debt.fecha_compra,
@@ -393,6 +392,32 @@ export const AppContextProvider = ({ children }) => {
         return [];
     };
 
+    const processDelivers = () => {
+        if (client && client?.entregas && client?.entregas?.length > 0) {
+            const detallesEntregas = client.entregas.flatMap((deliv) => {
+                const entregas = deliv.detalle_entrega;
+    
+                if (entregas && entregas.length > 0) {
+                    return entregas.map((deliver) => ({
+                        id: deliv.id,
+                        id_cliente: deliv.id_entrega_cliente,
+                        monto: deliver.deliverAmount,
+                        fecha: deliver.deliverDate
+                    }));
+                } else {
+                    return []; 
+                }
+            });
+    
+            return detallesEntregas; 
+        } else {
+            return [];
+        }
+    };
+
+   
+    
+
     useEffect(() => {
         if (client) {
             processDebts(client.deudas)
@@ -403,7 +428,7 @@ export const AppContextProvider = ({ children }) => {
         const formData = new FormData();
         formData.append("productos", JSON.stringify(debts));
         formData.append("buyDate", buyDate);
-        formData.append("expDate", dayjs(buyDate).add(1, "month"));
+        formData.append("expDate", dayjs(buyDate).add(1, "month").format("YYYY-MM-DD"));
         formData.append("clientDebtId", debtId)
         // depuracion de valores
         // for (const [key, value] of formData.entries()) {
@@ -420,6 +445,7 @@ export const AppContextProvider = ({ children }) => {
 
                 throw new Error(`${data.message}`);
             }
+            await getClientFile(clientId)
             notification.success({
                 message: "Deuda guardada exitosamente",
                 description: data.message,
@@ -441,6 +467,197 @@ export const AppContextProvider = ({ children }) => {
         }
     }
 
+    const saveClientDeliver = async(deliverData, clientId) => {
+        const formData = new FormData()
+        const hiddenMessage = message.loading("Guardando entrega...",0)
+        formData.append("deliversData", JSON.stringify([deliverData]) ?? "")
+        try {
+            const response = await fetch(`${baseUrl.api}/save-client-deliver/${clientId}`,{
+                method: "POST",
+                
+                body: formData
+            });
+            const data = await response.json();
+            if(!response.ok){
+                throw new Error(data.message || "No fue posible guardar la entrega");
+            }
+            await getClientFile(clientId)
+            notification.success({
+                message: "Se guardó la entrega exitosamente",
+                duration: 3,
+                showProgress: true
+            });
+        } catch (error) {
+            console.log("Error")
+            notification.error({
+                message: "Error al guardar la entrega",
+                description: error.message,
+                duration: 5,
+                showProgress: true
+            })
+        }finally{
+            hiddenMessage()
+        }
+    }
+
+    const editDeliver = async(deliverData, clientId, id) => {
+        const formData = new FormData()
+        const hiddenMessage = message.loading("Guardando entrega...",0)
+        formData.append("deliversData", JSON.stringify([deliverData]) ?? "")
+        try {
+            const response = await fetch(`${baseUrl.api}/update-client-deliver/${id}`,{
+                method: "PUT",
+                
+                body: formData
+            });
+            const data = await response.json();
+            if(!response.ok){
+                throw new Error(data.message || "No fue posible guardar la entrega");
+            }
+            await getClientFile(clientId)
+            notification.success({
+                message: "Se guardó la entrega exitosamente",
+                duration: 3,
+                showProgress: true
+            });
+        } catch (error) {
+            console.log("Error")
+            notification.error({
+                message: "Error al guardar la entrega",
+                description: error.message,
+                duration: 5,
+                showProgress: true
+            })
+        }finally{
+            hiddenMessage()
+        }
+    }
+
+    const deleteDeliver = async(deliverId, clientId) =>{
+        const hiddenMessage = message.loading("Eliminando entrega...",0)
+        try {
+            const response = await fetch(`${baseUrl.api}/delete-client-deliver/${deliverId}`,{
+                method: "DELETE"
+            })
+            const data = await response.json()
+            if (!response.ok) {
+                throw new Error(data.message)
+            }
+            await getClientFile(clientId)
+            notification.success({
+                message: "Entrega eliminada!",
+                description: data.message,
+                duration: 3,
+                showProgress: true
+            })
+        } catch (error) {
+            console.log(error)
+            notification.error({
+                message: "Entrega eliminada!",
+                description: error.message,
+                duration: 3,
+                showProgress: true
+            })
+        }finally{
+            hiddenMessage()
+        }
+    }
+
+    const editDebt = async(products, buyDate, debtUuid, clientId) => {
+        const hiddenMessage = message.loading("Guardando...", 0)
+        const formData = new FormData();
+        formData.append("productos", JSON.stringify(products));
+        formData.append("buyDate", buyDate);
+        formData.append("expDate", dayjs(buyDate).add(1, "month").format("YYYY-MM-DD"));
+        formData.append("clientDebtId", debtUuid)
+
+        try {
+            const response = await fetch(`${baseUrl.api}/update-client-debt/${clientId}`,{
+                method: "PUT",
+                body: formData
+            });
+
+            const data = await response.json()
+            if(!response.ok) throw new Error(data.message || "No fue posible guardar el producto");
+            await getClientFile(clientId)
+            notification.success({
+                message: "Deuda actualizada correctamente!",
+                description: data.message,
+                duration: 3,
+                showProgress: true
+            });
+
+        } catch (error) {
+            console.log(error)
+            notification.error({
+                message: "Error al actualizar la deuda",
+                description: error.message,
+                duration: 5,
+                showProgress: true
+            })
+        }finally{
+            hiddenMessage()
+        }
+    }
+
+    const deleteDebt = async(debtId, clientId) => {
+        const hiddenMessage = message.loading("Eliminando...", 0)
+        try {
+            const response = await fetch(`${baseUrl.api}/delete-client-debt/${debtId}`,{
+                method: "DELETE",
+                
+            });
+            
+            const data = response.json()
+            if(!response.ok) throw new Error(data.message || "No fue posible eliminar la deuda");
+            await getClientFile(clientId)
+            notification.success({
+                message: "Deuda eliminada!",
+                description: data.message,
+                duration: 3,
+                showProgress: true
+            })
+        } catch (error) {
+            console.log(error)
+            notification.error({
+                message: "Error al eliminar la deuda",
+                description: error.message,
+                duration: 5,
+                showProgress: true
+            })
+        }finally{
+            hiddenMessage()
+        }
+    }
+
+    const cancelDebts = async(clientId) => {
+        const hiddenMessage = message.loading("Cancelando...", 0)
+        try {
+            const response = await fetch(`${baseUrl.api}/cancel-client-debts/${clientId}`,{
+                method: "POST",
+                
+            });
+            const data = response.json()
+            if(!response.ok) throw new Error(data.message || "No fue posible cancelar la deuda");
+            await getClientFile(clientId)
+            notification.success({
+                message: "Deuda cancelada!",
+                description: data.message,
+                duration: 3,
+                showProgress: true
+            })
+        } catch (error) {
+            console.log(error)
+            notification.error({
+                message: "Error al cancelar la deuda",
+                description: error.message,
+                duration: 5,
+                showProgress: true
+            })
+        }finally{
+            hiddenMessage()
+        }
+    }
 
     useEffect(() => {
         if (user) {
@@ -471,7 +688,9 @@ export const AppContextProvider = ({ children }) => {
             deleteUser, currentUser, grantOrDenyAccess, saveClient,
             clients, editClient, deleteClient, setSearchText,
             orderedClients, capitaliceStrings, uuidv4, saveClientDebt,
-            getClientFile, client, processDebts,processedDebts
+            getClientFile, client, processDebts,processedDebts,
+            saveClientDeliver, processDelivers, editDeliver,
+            deleteDeliver, editDebt,deleteDebt, cancelDebts
         }}
         >
             {contextHolder}
