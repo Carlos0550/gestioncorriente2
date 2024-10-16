@@ -6,6 +6,8 @@ import { SignedIn, SignedOut } from '@clerk/clerk-react';
 import Login from './componentes/Inicio de sesion/Login';
 import ClientsManager from './componentes/AdministrarClientes/ClientsManager';
 import CurrentAccManager from './componentes/Cuentas Corrientes/CurrentAccManager';
+import ExpirationsManager from './componentes/Vencimientos/ExpirationsManager';
+import ReportsManager from './componentes/Reportes/ReportsManager';
 
 function App() {
   return (
@@ -34,6 +36,24 @@ function App() {
         element={
           <SignedIn>
             <CurrentAccManager />
+          </SignedIn>
+        }
+      />
+
+      <Route
+        path='/expirations'
+        element={
+          <SignedIn>
+            <ExpirationsManager />
+          </SignedIn>
+        }
+      />
+
+      <Route
+        path='/reports'
+        element={
+          <SignedIn>
+            <ReportsManager />
           </SignedIn>
         }
       />
