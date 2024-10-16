@@ -134,7 +134,7 @@ function ClientFile() {
         {
             key: 5,
             render: (_, record) => (
-                <Space>
+                <Space direction='vertical'>
                     <Button icon={<EditOutlined/>} type='primary' onClick={() => handleEditDebt(record.id)}/>
                     <Popconfirm
                         title="¿Deseas eliminar esta deuda?"
