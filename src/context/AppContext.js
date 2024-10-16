@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import App from "../App";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useNavigate } from "react-router-dom";
@@ -22,6 +22,7 @@ export const AppContextProvider = ({ children }) => {
     const navigate = useNavigate();
     const [api, contextHolder] = notification.useNotification();
 
+
     const [administrator, setAdministrator] = useState(false);
     const [authorized, setAuthorized] = useState(false);
     const [listaUsuarios, setListaUsuarios] = useState([]);
@@ -29,6 +30,12 @@ export const AppContextProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState([])
     const [clients, setClients] = useState([])
     const [searchText, setSearchText] = useState("")
+    const [isProcessingAuth, setIsProcessingAuth] = useState(true)
+    useEffect(() => {
+        if (isLoaded) {
+            setIsProcessingAuth(false)
+        }
+    }, [isLoaded])
 
     const orderedClients = clients
         .sort((a, b) => a.id - b.id)
@@ -50,10 +57,10 @@ export const AppContextProvider = ({ children }) => {
     const verifyUser = async () => {
         const formData = new FormData();
         const data = {
-            userName: user.fullName || "",
-            userEmail: user.emailAddresses[0]?.emailAddress || "",
-            userId: user.id || "",
-            userImage: user.imageUrl || ""
+            userName: user?.fullName || "",
+            userEmail: user?.emailAddresses[0]?.emailAddress || "",
+            userId: user?.id || "",
+            userImage: user?.imageUrl || ""
         };
 
         for (const key in data) {
@@ -132,8 +139,114 @@ export const AppContextProvider = ({ children }) => {
         }
     }
 
-    const deleteUser = async (id) => {
+    const [actionLogs, setActionsLogs] = useState({
+        userId: "",
+        userName: "",
+        userImage: "",
+        actionType: "",
+        entity: "",
+        entityId: "",
+        oldData: {},
+        newData: {},
+        details: "",
+        day: "",
+        time: ""
+    })
+
+    useEffect(() => {
+        setActionsLogs({
+            userId: user?.id,
+            userName: user?.fullName || "",
+            userImage: user?.imageUrl || "",
+        })
+    }, [user])
+
+    const sendActionsLogs = async (actionsLogs, retryCount = 0) => {
+        try {
+            const response = await fetch(`${baseUrl.api}/save-action-logs`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(actionsLogs)
+            });
+            if (response.status === 200) {
+                setActionsLogs({
+                    ...actionLogs,
+                    actionType: "",
+                    entity: "",
+                    entityId: "",
+                    oldData: {},
+                    newData: {},
+                    details: "",
+                    day: "",
+                    time: ""
+                })
+            } else {
+                throw new Error("Error en el servidor");
+            }
+
+        } catch (error) {
+            if (retryCount < 5) {
+                const delay = Math.pow(2, retryCount) * 1000
+                console.log(`Reintentando en ${delay / 1000} segundos...`);
+                setTimeout(() => {
+                    sendActionsLogs(retryCount += 1)
+                }, delay);
+
+            } else {
+                console.log("Guardando los logs en localStorage")
+                localStorage.setItem(`actionLogs-${uuidv4()}`, JSON.stringify(actionLogs));
+            }
+        }
+    }
+
+    const restoredLogs = async () => {
+        console.log("Verificando los logs en localStorage")
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith("actionLogs")) {
+                const storedLog = JSON.parse(localStorage.getItem(key));
+                try {
+                    const response = await fetch(`${baseUrl.api}/save-action-logs`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(storedLog)
+                    });
+                    if (response.status === 200) {
+                        console.log("Logs enviados, eliminando de localStorage");
+                        localStorage.removeItem(key);
+
+                    }
+                } catch (error) {
+                    console.error("Error al reenviar el log: ", error);
+                }
+            } else {
+                console.log("No hay logs en localStorage");
+            }
+
+        }
+    }
+
+    const alreadyVerifed = useRef(false)
+    useEffect(() => {
+        if (!alreadyVerifed.current) {
+            alreadyVerifed.current = true
+            restoredLogs()
+        }
+    }, [])
+
+    // useEffect(() => {
+    //     console.log("Logs: ", actionLogs)
+    // }, [actionLogs])
+
+    const deleteUser = async (userId) => {
         const hiddenMessage = message.loading("Eliminando usuario", 0)
+        const oldUser = listaUsuarios.find(user => user.id === userId)
+        const { administrador, autorizado, id, ...oldUserInfo } = oldUser
+
         try {
             const response = await fetch(`${baseUrl.api}/delete-user/${id}`, {
                 method: "DELETE"
@@ -142,6 +255,22 @@ export const AppContextProvider = ({ children }) => {
                 const cloneUsers = [...listaUsuarios]
                 const newUsers = cloneUsers.filter(user => user.id !== id)
                 setListaUsuarios(newUsers)
+                const actionsLogs = {
+                    ...actionLogs,
+                    actionType: "delete",
+                    entity: "usuarios",
+                    oldData: {
+                        oldUser: JSON.stringify(oldUserInfo)
+                    },
+                    details: `${actionLogs.userName} eliminó a ${capitaliceStrings(oldUserInfo.username)}`,
+                    newData: {
+                        newUser: ""
+                    },
+                    day: dayjs().format("YYYY-MM-DD"),
+                    time: dayjs().format("HH:mm:ss")
+
+                }
+                await sendActionsLogs(actionsLogs)
                 message.success("Se elimino el usuario")
             }
         } catch (error) {
@@ -153,28 +282,49 @@ export const AppContextProvider = ({ children }) => {
     }
 
     const grantOrDenyAccess = async (id) => {
-        const hiddenMessage = message.loading("Guardando...", 0)
         if (!id) {
             message.error("No se encontro el usuario")
             return;
         }
+
+        const affectedUser = listaUsuarios.find(u => u.id === id)
+        const { autorizado } = affectedUser
+        const hiddenMessage = message.loading("Guardando...", 0)
         try {
             const response = await fetch(`${baseUrl.api}/grant-access/${id}`, {
                 method: "PUT"
             });
 
             if (response.status === 200) {
-                const cloneUsers = [...listaUsuarios]
-                const newUsers = cloneUsers.map(user => {
+
+                const newUsers = listaUsuarios.map(user => {
                     if (user.id === id) {
                         return {
                             ...user,
                             autorizado: !user.autorizado
-                        }
+                        };
                     }
-                    return user
-                })
+                    return user;
+                });
                 setListaUsuarios(newUsers)
+
+                const actionsLogs = {
+                    ...actionLogs,
+                    actionType: "update",
+                    entity: "usuarios",
+                    oldData: {
+                        oldUser: JSON.stringify(affectedUser)
+                    },
+                    details: `${actionLogs.userName} ${autorizado ? "quitó" : "otorgó"} el acceso a ${capitaliceStrings(affectedUser.username)}`,
+                    newData: {
+                        newUser: JSON.stringify(newUsers.find(u => u.id === id))
+                    },
+                    day: dayjs().format("YYYY-MM-DD"),
+                    time: dayjs().format("HH:mm:ss")
+
+                }
+
+                await sendActionsLogs(actionsLogs)
                 message.success(`Acceso actualizado`)
             } else {
                 message.error("Error al actualizar el acceso")
@@ -195,6 +345,8 @@ export const AppContextProvider = ({ children }) => {
                 throw new Error("No es posible crear el cliente, faltan datos!")
             }
 
+
+
             for (const key in data) {
                 formData.append(key, data[key] ?? "");
             }
@@ -214,6 +366,21 @@ export const AppContextProvider = ({ children }) => {
                 placement: "topRight",
                 duration: 5
             })
+            const actionsLogs = {
+                ...actionLogs,
+                actionType: "insert",
+                entity: "clients",
+                oldData: { oldClient: "" },
+                details: `${actionLogs.userName} creó un nuevo cliente llamado ${capitaliceStrings(data.userName)}`,
+                newData: {
+                    newUser: JSON.stringify(data)
+                },
+                day: dayjs().format("YYYY-MM-DD"),
+                time: dayjs().format("HH:mm:ss")
+
+            }
+            await sendActionsLogs(actionsLogs)
+
         } catch (error) {
             console.log(error)
             notification.error({
@@ -253,6 +420,8 @@ export const AppContextProvider = ({ children }) => {
     const editClient = async (clientValues, clientId) => {
         const hiddenMessage = message.loading("Actualizando cliente...", 0)
         const formData = new FormData();
+        const oldClient = clients.find(client => client.id === clientId)
+
         if (!clientId) {
             notification.error({
                 message: "Error al actualizar el cliente",
@@ -277,6 +446,23 @@ export const AppContextProvider = ({ children }) => {
                 console.log(data)
                 throw new Error(`${data.message}`);
             } else {
+
+                const actionsLogs = {
+                    ...actionLogs,
+                    actionType: "update",
+                    entity: "clients",
+                    oldData: {
+                        oldClient: JSON.stringify(oldClient)
+                    },
+                    details: `${actionLogs.userName} editó los datos del cliente ${capitaliceStrings(oldClient.nombre_completo)}`,
+                    newData: {
+                        newClient: JSON.stringify(clientValues)
+                    },
+                    day: dayjs().format("YYYY-MM-DD"),
+                    time: dayjs().format("HH:mm:ss")
+
+                }
+                await sendActionsLogs(actionsLogs)
                 await getAllClients()
                 notification.success({
                     message: "Se actualizo el cliente",
@@ -284,6 +470,7 @@ export const AppContextProvider = ({ children }) => {
                     placement: "topRight",
                     duration: 5
                 })
+
             }
         } catch (error) {
             console.log(error)
@@ -298,23 +485,41 @@ export const AppContextProvider = ({ children }) => {
         }
     }
 
-    const deleteClient = (clientId) => {
+    const deleteClient = async (clientId) => {
         const hiddenMessage = message.loading("Eliminando cliente...", 0)
+        const oldClient = clients.find(client => client.id === clientId)
+        console.log(oldClient)
         try {
-            fetch(`${baseUrl.api}/delete-client/${clientId}`, {
+            const response = await fetch(`${baseUrl.api}/delete-client/${clientId}`, {
                 method: "DELETE"
             })
-                .then((response) => response.json())
-                .then((data) => {
-                    notification.success({
-                        message: "Se elimino el cliente",
-                        description: data.message,
-                        placement: "topRight",
-                        duration: 3,
-                        showProgress: true
-                    })
-                    getAllClients()
+
+            const data = response.json()
+            if (response.status === 200) {
+                const actionsLogs = {
+                    ...actionLogs,
+                    actionType: "delete",
+                    entity: "clients",
+                    oldData: {
+                        oldClient: JSON.stringify(oldClient)
+                    },
+                    details: `${actionLogs.userName} eliminó al cliente ${capitaliceStrings(oldClient.nombre_completo)}`,
+                    newData: { newClient: "" },
+                    day: dayjs().format("YYYY-MM-DD"),
+                    time: dayjs().format("HH:mm:ss")
+                }
+                await sendActionsLogs(actionsLogs)
+                await getAllClients()
+                notification.success({
+                    message: "Se elimino el cliente",
+                    description: data.message,
+                    placement: "topRight",
+                    duration: 3,
+                    showProgress: true
                 })
+
+            }
+
         } catch (error) {
             console.log(error)
             notification.error({
@@ -334,7 +539,7 @@ export const AppContextProvider = ({ children }) => {
         setProcessedDebts([])
         setClient([])
         const hiddenMessage = message.loading("Un momento...", 0)
-        setTimeout(async() => {
+        setTimeout(async () => {
             try {
                 const response = await fetch(`${baseUrl.api}/get-client-file/${clientId}`);
                 if (!response.ok) {
@@ -342,7 +547,7 @@ export const AppContextProvider = ({ children }) => {
                 }
                 const data = await response.json()
                 setClient(data)
-                
+
             } catch (error) {
                 console.log(error)
                 notification.error({
@@ -364,18 +569,18 @@ export const AppContextProvider = ({ children }) => {
             const clientFile = debts.map((debt) => {
                 const products = debt.detalles.map((prod) => {
                     const productArray = prod.split(" ");
-                    const productQuantity = productArray[0]; 
-                    const productPrice = parseFloat(productArray[productArray.length - 1]); 
-    
+                    const productQuantity = productArray[0];
+                    const productPrice = parseFloat(productArray[productArray.length - 1]);
+
                     const productName = productArray.slice(1, productArray.length - 1).join(" ");
-    
+
                     return {
                         cantidad: productQuantity,
                         nombre: productName,
                         precio: productPrice
                     };
                 });
-    
+
                 return {
                     id: debt.id,
                     debtUuid: debt.deuda_uuid,
@@ -383,10 +588,10 @@ export const AppContextProvider = ({ children }) => {
                     productos: products,
                     fechaCompra: debt.fecha_compra,
                     fechaVencimiento: debt.fecha_vencimiento,
-                    estado: debt.estado ? "Al día" : "Pendiente" 
+                    estado: debt.estado ? "Al día" : "Pendiente"
                 };
             });
-    
+
             setProcessedDebts(clientFile);
         }
         return [];
@@ -396,7 +601,7 @@ export const AppContextProvider = ({ children }) => {
         if (client && client?.entregas && client?.entregas?.length > 0) {
             const detallesEntregas = client.entregas.flatMap((deliv) => {
                 const entregas = deliv.detalle_entrega;
-    
+
                 if (entregas && entregas.length > 0) {
                     return entregas.map((deliver) => ({
                         id: deliv.id,
@@ -405,18 +610,18 @@ export const AppContextProvider = ({ children }) => {
                         fecha: deliver.deliverDate
                     }));
                 } else {
-                    return []; 
+                    return [];
                 }
             });
-    
-            return detallesEntregas; 
+
+            return detallesEntregas;
         } else {
             return [];
         }
     };
 
-   
-    
+
+
 
     useEffect(() => {
         if (client) {
@@ -426,14 +631,24 @@ export const AppContextProvider = ({ children }) => {
     const saveClientDebt = async (debts, buyDate, debtId, clientId) => {
         const hiddenMessage = message.loading("Guardando...", 0)
         const formData = new FormData();
+        const processedDebts = debts.map((debt) => {
+            const productArray = debt.split(" ");
+            const productQuantity = productArray[0];
+            const productPrice = parseFloat(productArray[productArray.length - 1]);
+
+            const productName = productArray.slice(1, productArray.length - 1).join(" ");
+
+            return {
+                cantidad: productQuantity,
+                nombre: productName,
+                precio: productPrice
+            };
+        })
+
         formData.append("productos", JSON.stringify(debts));
         formData.append("buyDate", buyDate);
         formData.append("expDate", dayjs(buyDate).add(1, "month").format("YYYY-MM-DD"));
         formData.append("clientDebtId", debtId)
-        // depuracion de valores
-        // for (const [key, value] of formData.entries()) {
-        //     console.log("key: ", key, "value: ", value);
-        // }
 
         try {
             const response = await fetch(`${baseUrl.api}/save-client-debt/${clientId}`, {
@@ -445,6 +660,23 @@ export const AppContextProvider = ({ children }) => {
 
                 throw new Error(`${data.message}`);
             }
+
+            const actionsLogs = {
+                ...actionLogs,
+                actionType: "create",
+                entity: "debts",
+                oldData: {
+                    oldDebt: ""
+                },
+                details: `${actionLogs.userName} creó una deuda para el cliente ${clients.find(client => client.id === clientId).nombre_completo}`,
+                newData: {
+                    newDebt: JSON.stringify(processedDebts)
+                },
+                day: dayjs().format("YYYY-MM-DD"),
+                time: dayjs().format("HH:mm:ss")
+
+            }
+            await sendActionsLogs(actionsLogs)
             await getClientFile(clientId)
             notification.success({
                 message: "Deuda guardada exitosamente",
@@ -467,20 +699,36 @@ export const AppContextProvider = ({ children }) => {
         }
     }
 
-    const saveClientDeliver = async(deliverData, clientId) => {
+    const saveClientDeliver = async (deliverData, clientId) => {
         const formData = new FormData()
-        const hiddenMessage = message.loading("Guardando entrega...",0)
+        const hiddenMessage = message.loading("Guardando entrega...", 0)
         formData.append("deliversData", JSON.stringify([deliverData]) ?? "")
         try {
-            const response = await fetch(`${baseUrl.api}/save-client-deliver/${clientId}`,{
+            const response = await fetch(`${baseUrl.api}/save-client-deliver/${clientId}`, {
                 method: "POST",
-                
+
                 body: formData
             });
             const data = await response.json();
-            if(!response.ok){
+            if (!response.ok) {
                 throw new Error(data.message || "No fue posible guardar la entrega");
             }
+            const actionsLogs = {
+                ...actionLogs,
+                actionType: "create",
+                entity: "delivers",
+                oldData: {
+                    oldDeliver: ""
+                },
+                details: `${actionLogs.userName} recibió una entrega del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
+                newData: {
+                    newDeliver: JSON.stringify(deliverData)
+                },
+                day: dayjs().format("YYYY-MM-DD"),
+                time: dayjs().format("HH:mm:ss")
+
+            }
+            await sendActionsLogs(actionsLogs)
             await getClientFile(clientId)
             notification.success({
                 message: "Se guardó la entrega exitosamente",
@@ -495,25 +743,45 @@ export const AppContextProvider = ({ children }) => {
                 duration: 5,
                 showProgress: true
             })
-        }finally{
+        } finally {
             hiddenMessage()
         }
     }
 
-    const editDeliver = async(deliverData, clientId, id) => {
+    const editDeliver = async (deliverData, clientId, deliverId) => {
         const formData = new FormData()
-        const hiddenMessage = message.loading("Guardando entrega...",0)
+        const hiddenMessage = message.loading("Guardando entrega...", 0)
         formData.append("deliversData", JSON.stringify([deliverData]) ?? "")
+        const oldDeliver = processDelivers().find(deliver => deliver.id === deliverId)
+        const { id,id_cliente, ...oldDeliverInfo } = oldDeliver
         try {
-            const response = await fetch(`${baseUrl.api}/update-client-deliver/${id}`,{
+            const response = await fetch(`${baseUrl.api}/update-client-deliver/${deliverId}`, {
                 method: "PUT",
-                
+
                 body: formData
             });
             const data = await response.json();
-            if(!response.ok){
+            if (!response.ok) {
                 throw new Error(data.message || "No fue posible guardar la entrega");
             }
+            const actionsLogs = {
+                ...actionLogs,
+                actionType: "update",
+                entity: "delivers",
+                oldData: {
+                    oldDeliver: JSON.stringify(oldDeliverInfo)
+                },
+                details: `${actionLogs.userName} editó una entrega del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
+                newData: {
+                    newDeliver: JSON.stringify(deliverData)
+                },
+                day: dayjs().format("YYYY-MM-DD"),
+                time: dayjs().format("HH:mm:ss")
+
+            }
+            await sendActionsLogs(actionsLogs)
+
+           
             await getClientFile(clientId)
             notification.success({
                 message: "Se guardó la entrega exitosamente",
@@ -528,21 +796,41 @@ export const AppContextProvider = ({ children }) => {
                 duration: 5,
                 showProgress: true
             })
-        }finally{
+        } finally {
             hiddenMessage()
         }
     }
 
-    const deleteDeliver = async(deliverId, clientId) =>{
-        const hiddenMessage = message.loading("Eliminando entrega...",0)
+    const deleteDeliver = async (deliverId, clientId) => {
+        const hiddenMessage = message.loading("Eliminando entrega...", 0)
+        const oldDeliver = processDelivers().find(deliver => deliver.id === deliverId)
+        const { id,id_cliente, ...oldDeliverInfo } = oldDeliver
         try {
-            const response = await fetch(`${baseUrl.api}/delete-client-deliver/${deliverId}`,{
+            const response = await fetch(`${baseUrl.api}/delete-client-deliver/${deliverId}`, {
                 method: "DELETE"
             })
             const data = await response.json()
             if (!response.ok) {
                 throw new Error(data.message)
             }
+
+            const actionsLogs = {
+                ...actionLogs,
+                actionType: "delete",
+                entity: "delivers",
+                oldData: {
+                    oldDeliver: JSON.stringify(oldDeliverInfo)
+                },
+                details: `${actionLogs.userName} eliminó una entrega del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
+                newData: {
+                    newDeliver: ""
+                },
+                day: dayjs().format("YYYY-MM-DD"),
+                time: dayjs().format("HH:mm:ss")
+
+            }
+            await sendActionsLogs(actionsLogs)
+
             await getClientFile(clientId)
             notification.success({
                 message: "Entrega eliminada!",
@@ -558,27 +846,58 @@ export const AppContextProvider = ({ children }) => {
                 duration: 3,
                 showProgress: true
             })
-        }finally{
+        } finally {
             hiddenMessage()
         }
     }
 
-    const editDebt = async(products, buyDate, debtUuid, clientId) => {
+    const editDebt = async (products, buyDate, debtUuid, clientId) => {
         const hiddenMessage = message.loading("Guardando...", 0)
         const formData = new FormData();
         formData.append("productos", JSON.stringify(products));
         formData.append("buyDate", buyDate);
         formData.append("expDate", dayjs(buyDate).add(1, "month").format("YYYY-MM-DD"));
         formData.append("clientDebtId", debtUuid)
+        const oldDebt = processedDebts.find(debt => debt.debtUuid === debtUuid).productos
+        const processedDebt = products.map((debt) => {
+            const productArray = debt.split(" ");
+            const productQuantity = productArray[0];
+            const productPrice = parseFloat(productArray[productArray.length - 1]);
 
+            const productName = productArray.slice(1, productArray.length - 1).join(" ");
+
+            return {
+                cantidad: productQuantity,
+                nombre: productName,
+                precio: productPrice
+            };
+        })
         try {
-            const response = await fetch(`${baseUrl.api}/update-client-debt/${clientId}`,{
+            const response = await fetch(`${baseUrl.api}/update-client-debt/${clientId}`, {
                 method: "PUT",
                 body: formData
             });
 
             const data = await response.json()
-            if(!response.ok) throw new Error(data.message || "No fue posible guardar el producto");
+            if (!response.ok) throw new Error(data.message || "No fue posible guardar el producto");
+
+            const actionsLogs = {
+                ...actionLogs,
+                actionType: "update",
+                entity: "debts",
+                oldData: {
+                    oldDebt: JSON.stringify(oldDebt)
+                },
+                details: `${actionLogs.userName} Editó una deuda del cliente ${clients.find(client => client.id === clientId).nombre_completo}`,
+                newData: {
+                    newDebt: JSON.stringify(processedDebt)
+                },
+                day: dayjs().format("YYYY-MM-DD"),
+                time: dayjs().format("HH:mm:ss")
+
+            }
+            await sendActionsLogs(actionsLogs)
+
             await getClientFile(clientId)
             notification.success({
                 message: "Deuda actualizada correctamente!",
@@ -595,21 +914,42 @@ export const AppContextProvider = ({ children }) => {
                 duration: 5,
                 showProgress: true
             })
-        }finally{
+        } finally {
             hiddenMessage()
         }
     }
 
-    const deleteDebt = async(debtId, clientId) => {
+    const deleteDebt = async (debtId, clientId) => {
         const hiddenMessage = message.loading("Eliminando...", 0)
+        const oldDebt = processedDebts.find(debt => debt.debtUuid === debtId)
+        const { clienteId, debtUuid, estado, id, ...oldDebtInfo } = oldDebt
+    
         try {
-            const response = await fetch(`${baseUrl.api}/delete-client-debt/${debtId}`,{
+            const response = await fetch(`${baseUrl.api}/delete-client-debt/${debtId}`, {
                 method: "DELETE",
-                
+
             });
-            
+
             const data = response.json()
-            if(!response.ok) throw new Error(data.message || "No fue posible eliminar la deuda");
+            if (!response.ok) throw new Error(data.message || "No fue posible eliminar la deuda");
+
+            const actionsLogs = {
+                ...actionLogs,
+                actionType: "delete",
+                entity: "debts",
+                oldData: {
+                    oldDebt: JSON.stringify(JSON.stringify(oldDebtInfo))
+                },
+                details: `${actionLogs.userName} Eliminó una deuda del cliente ${clients.find(client => client.id === clientId).nombre_completo}`,
+                newData: {
+                    newDebt: ""
+                },
+                day: dayjs().format("YYYY-MM-DD"),
+                time: dayjs().format("HH:mm:ss")
+
+            }
+            await sendActionsLogs(actionsLogs)
+
             await getClientFile(clientId)
             notification.success({
                 message: "Deuda eliminada!",
@@ -625,21 +965,56 @@ export const AppContextProvider = ({ children }) => {
                 duration: 5,
                 showProgress: true
             })
-        }finally{
+        } finally {
             hiddenMessage()
         }
     }
 
-    const cancelDebts = async(clientId) => {
+    const cancelDebts = async (clientId) => {
         const hiddenMessage = message.loading("Cancelando...", 0)
+        const oldDebts = processedDebts.filter(debt => debt.clienteId === clientId)
+        const oldDelivers = processDelivers().filter(delivers => delivers.id_cliente === clientId)
+        const processedOldDelivers = oldDelivers.map((deliver)=> {
+            return {
+                deliver: deliver.monto,
+                fecha: deliver.fecha
+            }
+        })
+
+        const processedOldDebts = oldDebts.map((debts) => {
+            const productos = debts.productos
+            return {
+                fechaCompra: debts.fechaCompra,
+                productos
+            }
+        })
+
         try {
-            const response = await fetch(`${baseUrl.api}/cancel-client-debts/${clientId}`,{
+            const response = await fetch(`${baseUrl.api}/cancel-client-debts/${clientId}`, {
                 method: "POST",
-                
+
             });
             const data = await response.json()
-            console.log(data)
-            if(!response.ok) throw new Error(data.message ?? "No fue posible cancelar la deuda");
+            if (!response.ok) throw new Error(data.message ?? "No fue posible cancelar la deuda");
+
+            const actionsLogs = {
+                ...actionLogs,
+                actionType: "insert",
+                entity: "history_client",
+                oldData: {
+                    oldDebts: JSON.stringify(processedOldDebts),
+                    oldDelivers: JSON.stringify(processedOldDelivers)
+                },
+                details: `${actionLogs.userName} Canceló una deuda del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
+                newData: {
+                    
+                },
+                day: dayjs().format("YYYY-MM-DD"),
+                time: dayjs().format("HH:mm:ss")
+
+            }
+            await sendActionsLogs(actionsLogs)
+
             await getClientFile(clientId)
             notification.success({
                 message: "Deuda cancelada!",
@@ -655,7 +1030,7 @@ export const AppContextProvider = ({ children }) => {
                 duration: 5,
                 showProgress: true
             })
-        }finally{
+        } finally {
             hiddenMessage()
         }
     }
@@ -689,13 +1064,25 @@ export const AppContextProvider = ({ children }) => {
             deleteUser, currentUser, grantOrDenyAccess, saveClient,
             clients, editClient, deleteClient, setSearchText,
             orderedClients, capitaliceStrings, uuidv4, saveClientDebt,
-            getClientFile, client, processDebts,processedDebts,
+            getClientFile, client, processDebts, processedDebts,
             saveClientDeliver, processDelivers, editDeliver,
-            deleteDeliver, editDebt,deleteDebt, cancelDebts
+            deleteDeliver, editDebt, deleteDebt, cancelDebts
         }}
         >
             {contextHolder}
             {children}
+            {isProcessingAuth && (
+                <>
+                    <div className="loader-container">
+                        <div class="newtons-cradle">
+                            <div class="newtons-cradle__dot"></div>
+                            <div class="newtons-cradle__dot"></div>
+                            <div class="newtons-cradle__dot"></div>
+                            <div class="newtons-cradle__dot"></div>
+                        </div>
+                    </div>
+                </>
+            )}
         </AppContext.Provider>
     )
 }
