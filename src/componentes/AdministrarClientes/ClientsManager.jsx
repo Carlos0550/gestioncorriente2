@@ -196,9 +196,9 @@ function ClientsManager() {
                     label="Teléfono de contácto"
                    rules={[
                     {
-                      validator: (_, value) => {
+                      validator: (_, value = "") => {
                         const regex = new RegExp("^[0-9]+$")
-                        if (!regex.test(value)) {
+                        if (value.trim().length > 0 && !regex.test(value)) {
                           return Promise.reject(new Error("El teléfono solo puede contener números."))
                         }
                         return Promise.resolve()
