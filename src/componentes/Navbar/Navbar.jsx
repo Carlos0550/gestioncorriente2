@@ -40,10 +40,10 @@ function Navbar() {
                         Clientes
                     </li>
                     <li onClick={()=> navigate("/cuentas-corrientes")} className={location.pathname==="/cuentas-corrientes/*" ? 'nav-pc__li active' : 'nav-pc__li'}>Cuentas C.</li>
-                    <li className='nav-pc__li'>Pagos</li>
-                    <li className='nav-pc__li'>Vencimientos</li>
+
+                    <li className={location.pathname === "/expirations" ? 'nav-pc__li active' : 'nav-pc__li'} onClick={()=> navigate("/expirations")}>Vencimientos</li>
                     {currentUser?.administrador && (
-                        <li className='nav-pc__li'>Reportes</li>
+                        <li className={location.pathname === "/reports" ? 'nav-pc__li active' : 'nav-pc__li'} onClick={()=> navigate("/reports")}>Reportes</li>
                     )}
                     {currentUser?.administrador && (
                         <li className='nav-pc__li'>Ajustes</li>
