@@ -73,9 +73,9 @@ export const AppContextProvider = ({ children }) => {
                 body: formData
             });
 
+
             if (!response.status === 200) {
-                const errorMessage = await response.text();
-                throw new Error(`Error en la verificación del usuario: ${errorMessage}`);
+                throw new Error(`Error en la verificación del usuario`);
             }
 
             const data = await response.json();
@@ -85,35 +85,48 @@ export const AppContextProvider = ({ children }) => {
                 setCurrentUser(data.currentUser)
                 await getAllClients()
                 api.success({
-                    message: "Acceso autorizado",
-                    description: "Se ha verificado el usuario correctamente",
+                    message: data.message,
                     placement: "topRight",
-                    duration: 3
+                    duration: 2,
+                    showProgress: true
                 })
             } else if (data.autorizado === true && data.administrador === false) {
                 setAuthorized(true)
                 setCurrentUser(data.currentUser)
                 await getAllClients()
                 notification.success({
-                    message: "Acceso autorizado",
-                    description: "Se ha verificado el usuario correctamente",
+                    message: data.message,
                     placement: "topRight",
-                    duration: 3
+                    duration: 2,
+                    showProgress: true
                 })
-            } else {
+            } else if (response.status === 404) {
                 setNonAuthorized(true)
                 notification.error({
-                    message: "Acceso no autorizado",
-                    description: "Contacte con su administrador para obtener acceso",
+                    message: data.message,
                     placement: "topRight",
-                    duration: 3
+                    duration: 3,
+                    showProgress: true
                 })
                 setAuthorized(false)
                 setAdministrator(false)
                 setTimeout(() => {
                     signOut()
                 }, 3000);
-
+            } else {
+                setNonAuthorized(true)
+                notification.error({
+                    message: "Acceso no autorizado",
+                    description: "Contacte con su administrador para obtener acceso",
+                    placement: "topRight",
+                    duration: 3,
+                    showProgress: true
+                })
+                setAuthorized(false)
+                setAdministrator(false)
+                setTimeout(() => {
+                    signOut()
+                }, 3000);
             }
         } catch (error) {
             message.error(`Error al verificar el usuario: ${error.message}`, 3);
@@ -175,7 +188,6 @@ export const AppContextProvider = ({ children }) => {
                     ...actionLogs,
                     actionType: "",
                     entity: "",
-                    entityId: "",
                     oldData: {},
                     newData: {},
                     details: "",
@@ -238,40 +250,29 @@ export const AppContextProvider = ({ children }) => {
         }
     }, [])
 
-    // useEffect(() => {
-    //     console.log("Logs: ", actionLogs)
-    // }, [actionLogs])
-
     const deleteUser = async (userId) => {
         const hiddenMessage = message.loading("Eliminando usuario", 0)
-        const oldUser = listaUsuarios.find(user => user.id === userId)
-        const { administrador, autorizado, id, ...oldUserInfo } = oldUser
+        const cloneUsers = [...listaUsuarios]
+        const newUsers = cloneUsers.filter(user => user.id !== userId)
 
         try {
-            const response = await fetch(`${baseUrl.api}/delete-user/${id}`, {
+            const response = await fetch(`${baseUrl.api}/delete-user/${userId}`, {
                 method: "DELETE"
             })
             if (response.status === 200) {
-                const cloneUsers = [...listaUsuarios]
-                const newUsers = cloneUsers.filter(user => user.id !== id)
                 setListaUsuarios(newUsers)
+                message.success("Se elimino el usuario")
                 const actionsLogs = {
                     ...actionLogs,
                     actionType: "delete",
                     entity: "usuarios",
-                    oldData: {
-                        oldUser: JSON.stringify(oldUserInfo)
-                    },
-                    details: `${actionLogs.userName} eliminó a ${capitaliceStrings(oldUserInfo.username)}`,
-                    newData: {
-                        newUser: ""
-                    },
+                    oldData: {},
+                    newData: {},
+                    details: `${actionLogs.userName} eliminó del sistema a ${capitaliceStrings(cloneUsers.find(usr => usr.id === userId).username)}`,
                     day: dayjs().format("YYYY-MM-DD"),
                     time: dayjs().format("HH:mm:ss")
-
                 }
                 await sendActionsLogs(actionsLogs)
-                message.success("Se elimino el usuario")
             }
         } catch (error) {
             console.log(error)
@@ -286,10 +287,9 @@ export const AppContextProvider = ({ children }) => {
             message.error("No se encontro el usuario")
             return;
         }
-
+        const hiddenMessage = message.loading("Guardando...", 0)
         const affectedUser = listaUsuarios.find(u => u.id === id)
         const { autorizado } = affectedUser
-        const hiddenMessage = message.loading("Guardando...", 0)
         try {
             const response = await fetch(`${baseUrl.api}/grant-access/${id}`, {
                 method: "PUT"
@@ -312,20 +312,16 @@ export const AppContextProvider = ({ children }) => {
                     ...actionLogs,
                     actionType: "update",
                     entity: "usuarios",
-                    oldData: {
-                        oldUser: JSON.stringify(affectedUser)
-                    },
+                    oldData: {},
+                    newData: {},
                     details: `${actionLogs.userName} ${autorizado ? "quitó" : "otorgó"} el acceso a ${capitaliceStrings(affectedUser.username)}`,
-                    newData: {
-                        newUser: JSON.stringify(newUsers.find(u => u.id === id))
-                    },
                     day: dayjs().format("YYYY-MM-DD"),
                     time: dayjs().format("HH:mm:ss")
 
                 }
 
                 await sendActionsLogs(actionsLogs)
-                message.success(`Acceso actualizado`)
+                message.success(`El acceso a ${affectedUser.username} fué ${autorizado ? "removido" : "concedido"}`)
             } else {
                 message.error("Error al actualizar el acceso")
             }
@@ -345,15 +341,15 @@ export const AppContextProvider = ({ children }) => {
                 throw new Error("No es posible crear el cliente, faltan datos!")
             }
 
-
-
             for (const key in data) {
                 formData.append(key, data[key] ?? "");
             }
+
             const response = await fetch(`${baseUrl.api}/save-client`, {
                 method: "POST",
                 body: formData
             });
+
             if (!response.ok) {
                 throw new Error("Error al crear el cliente");
             }
@@ -370,11 +366,9 @@ export const AppContextProvider = ({ children }) => {
                 ...actionLogs,
                 actionType: "insert",
                 entity: "clients",
-                oldData: { oldClient: "" },
+                oldData: {},
+                newData: {},
                 details: `${actionLogs.userName} creó un nuevo cliente llamado ${capitaliceStrings(data.userName)}`,
-                newData: {
-                    newUser: JSON.stringify(data)
-                },
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
 
@@ -422,6 +416,13 @@ export const AppContextProvider = ({ children }) => {
         const formData = new FormData();
         const oldClient = clients.find(client => client.id === clientId)
 
+        const oldClientJson = {
+            userDni: oldClient.dni,
+            userEmail: oldClient.email,
+            userName: oldClient.nombre_completo,
+            userPhone: oldClient.telefono
+        }
+
         if (!clientId) {
             notification.error({
                 message: "Error al actualizar el cliente",
@@ -431,6 +432,8 @@ export const AppContextProvider = ({ children }) => {
             })
             return;
         }
+
+
         for (const key of Object.keys(clientValues)) {
             formData.append(key, clientValues[key] ?? "")
         }
@@ -452,11 +455,11 @@ export const AppContextProvider = ({ children }) => {
                     actionType: "update",
                     entity: "clients",
                     oldData: {
-                        oldClient: JSON.stringify(oldClient)
+                        oldData: JSON.stringify(oldClientJson)
                     },
                     details: `${actionLogs.userName} editó los datos del cliente ${capitaliceStrings(oldClient.nombre_completo)}`,
                     newData: {
-                        newClient: JSON.stringify(clientValues)
+                        newData: JSON.stringify(clientValues)
                     },
                     day: dayjs().format("YYYY-MM-DD"),
                     time: dayjs().format("HH:mm:ss")
@@ -487,8 +490,7 @@ export const AppContextProvider = ({ children }) => {
 
     const deleteClient = async (clientId) => {
         const hiddenMessage = message.loading("Eliminando cliente...", 0)
-        const oldClient = clients.find(client => client.id === clientId)
-        console.log(oldClient)
+        const oldClientName = clients.find(client => client.id === clientId).nombre_completo
         try {
             const response = await fetch(`${baseUrl.api}/delete-client/${clientId}`, {
                 method: "DELETE"
@@ -500,11 +502,9 @@ export const AppContextProvider = ({ children }) => {
                     ...actionLogs,
                     actionType: "delete",
                     entity: "clients",
-                    oldData: {
-                        oldClient: JSON.stringify(oldClient)
-                    },
-                    details: `${actionLogs.userName} eliminó al cliente ${capitaliceStrings(oldClient.nombre_completo)}`,
-                    newData: { newClient: "" },
+                    oldData: {},
+                    newData: {},
+                    details: `${actionLogs.userName} eliminó al cliente ${capitaliceStrings(oldClientName)} junto con su fichero e historial`,
                     day: dayjs().format("YYYY-MM-DD"),
                     time: dayjs().format("HH:mm:ss")
                 }
@@ -620,14 +620,12 @@ export const AppContextProvider = ({ children }) => {
         }
     };
 
-
-
-
     useEffect(() => {
         if (client) {
             processDebts(client.deudas)
         }
     }, [client])
+
     const saveClientDebt = async (debts, buyDate, debtId, clientId) => {
         const hiddenMessage = message.loading("Guardando...", 0)
         const formData = new FormData();
@@ -643,7 +641,7 @@ export const AppContextProvider = ({ children }) => {
                 nombre: productName,
                 precio: productPrice
             };
-        })
+        });
 
         formData.append("productos", JSON.stringify(debts));
         formData.append("buyDate", buyDate);
@@ -665,13 +663,9 @@ export const AppContextProvider = ({ children }) => {
                 ...actionLogs,
                 actionType: "create",
                 entity: "debts",
-                oldData: {
-                    oldDebt: ""
-                },
+                oldData: {},
+                newData: { newData: JSON.stringify(processedDebts) },
                 details: `${actionLogs.userName} creó una deuda para el cliente ${clients.find(client => client.id === clientId).nombre_completo}`,
-                newData: {
-                    newDebt: JSON.stringify(processedDebts)
-                },
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
 
@@ -717,13 +711,9 @@ export const AppContextProvider = ({ children }) => {
                 ...actionLogs,
                 actionType: "create",
                 entity: "delivers",
-                oldData: {
-                    oldDeliver: ""
-                },
+                oldData: {},
                 details: `${actionLogs.userName} recibió una entrega del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
-                newData: {
-                    newDeliver: JSON.stringify(deliverData)
-                },
+                newData: { newData: JSON.stringify(deliverData) },
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
 
@@ -753,7 +743,14 @@ export const AppContextProvider = ({ children }) => {
         const hiddenMessage = message.loading("Guardando entrega...", 0)
         formData.append("deliversData", JSON.stringify([deliverData]) ?? "")
         const oldDeliver = processDelivers().find(deliver => deliver.id === deliverId)
-        const { id,id_cliente, ...oldDeliverInfo } = oldDeliver
+        const { id, id_cliente, ...oldDeliverInfo } = oldDeliver
+
+        const newDeliver = {
+            monto: deliverData.deliverAmount,
+            fecha: deliverData.deliverDate
+        }
+
+
         try {
             const response = await fetch(`${baseUrl.api}/update-client-deliver/${deliverId}`, {
                 method: "PUT",
@@ -769,19 +766,17 @@ export const AppContextProvider = ({ children }) => {
                 actionType: "update",
                 entity: "delivers",
                 oldData: {
-                    oldDeliver: JSON.stringify(oldDeliverInfo)
+                    oldData: JSON.stringify(oldDeliverInfo)
+                },
+                newData: {
+                    newData: JSON.stringify(newDeliver)
                 },
                 details: `${actionLogs.userName} editó una entrega del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
-                newData: {
-                    newDeliver: JSON.stringify(deliverData)
-                },
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
-
             }
             await sendActionsLogs(actionsLogs)
 
-           
             await getClientFile(clientId)
             notification.success({
                 message: "Se guardó la entrega exitosamente",
@@ -804,7 +799,8 @@ export const AppContextProvider = ({ children }) => {
     const deleteDeliver = async (deliverId, clientId) => {
         const hiddenMessage = message.loading("Eliminando entrega...", 0)
         const oldDeliver = processDelivers().find(deliver => deliver.id === deliverId)
-        const { id,id_cliente, ...oldDeliverInfo } = oldDeliver
+        const { id, id_cliente, ...oldDeliverInfo } = oldDeliver
+
         try {
             const response = await fetch(`${baseUrl.api}/delete-client-deliver/${deliverId}`, {
                 method: "DELETE"
@@ -819,15 +815,12 @@ export const AppContextProvider = ({ children }) => {
                 actionType: "delete",
                 entity: "delivers",
                 oldData: {
-                    oldDeliver: JSON.stringify(oldDeliverInfo)
+                    oldData: JSON.stringify(oldDeliverInfo)
                 },
                 details: `${actionLogs.userName} eliminó una entrega del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
-                newData: {
-                    newDeliver: ""
-                },
+                newData: {},
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
-
             }
             await sendActionsLogs(actionsLogs)
 
@@ -858,6 +851,7 @@ export const AppContextProvider = ({ children }) => {
         formData.append("buyDate", buyDate);
         formData.append("expDate", dayjs(buyDate).add(1, "month").format("YYYY-MM-DD"));
         formData.append("clientDebtId", debtUuid)
+
         const oldDebt = processedDebts.find(debt => debt.debtUuid === debtUuid).productos
         const processedDebt = products.map((debt) => {
             const productArray = debt.split(" ");
@@ -872,6 +866,9 @@ export const AppContextProvider = ({ children }) => {
                 precio: productPrice
             };
         })
+
+
+
         try {
             const response = await fetch(`${baseUrl.api}/update-client-debt/${clientId}`, {
                 method: "PUT",
@@ -886,11 +883,11 @@ export const AppContextProvider = ({ children }) => {
                 actionType: "update",
                 entity: "debts",
                 oldData: {
-                    oldDebt: JSON.stringify(oldDebt)
+                    oldData: JSON.stringify(oldDebt)
                 },
-                details: `${actionLogs.userName} Editó una deuda del cliente ${clients.find(client => client.id === clientId).nombre_completo}`,
+                details: `${actionLogs.userName} editó una deuda del cliente ${clients.find(client => client.id === clientId).nombre_completo}`,
                 newData: {
-                    newDebt: JSON.stringify(processedDebt)
+                    newData: JSON.stringify(processedDebt)
                 },
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
@@ -923,7 +920,7 @@ export const AppContextProvider = ({ children }) => {
         const hiddenMessage = message.loading("Eliminando...", 0)
         const oldDebt = processedDebts.find(debt => debt.debtUuid === debtId)
         const { clienteId, debtUuid, estado, id, ...oldDebtInfo } = oldDebt
-    
+
         try {
             const response = await fetch(`${baseUrl.api}/delete-client-debt/${debtId}`, {
                 method: "DELETE",
@@ -938,15 +935,13 @@ export const AppContextProvider = ({ children }) => {
                 actionType: "delete",
                 entity: "debts",
                 oldData: {
-                    oldDebt: JSON.stringify(JSON.stringify(oldDebtInfo))
+                    oldData: JSON.stringify(oldDebtInfo)
                 },
                 details: `${actionLogs.userName} Eliminó una deuda del cliente ${clients.find(client => client.id === clientId).nombre_completo}`,
-                newData: {
-                    newDebt: ""
-                },
+                newData: {},
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
-
+    
             }
             await sendActionsLogs(actionsLogs)
 
@@ -974,7 +969,7 @@ export const AppContextProvider = ({ children }) => {
         const hiddenMessage = message.loading("Cancelando...", 0)
         const oldDebts = processedDebts.filter(debt => debt.clienteId === clientId)
         const oldDelivers = processDelivers().filter(delivers => delivers.id_cliente === clientId)
-        const processedOldDelivers = oldDelivers.map((deliver)=> {
+        const processedOldDelivers = oldDelivers.map((deliver) => {
             return {
                 deliver: deliver.monto,
                 fecha: deliver.fecha
@@ -1006,9 +1001,7 @@ export const AppContextProvider = ({ children }) => {
                     oldDelivers: JSON.stringify(processedOldDelivers)
                 },
                 details: `${actionLogs.userName} Canceló una deuda del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
-                newData: {
-                    
-                },
+                newData: {},
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
 
