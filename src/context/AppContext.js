@@ -449,17 +449,18 @@ export const AppContextProvider = ({ children }) => {
                 console.log(data)
                 throw new Error(`${data.message}`);
             } else {
-
+                const oldDataSerialized = JSON.stringify(oldClientJson)
+                const newDataSerialized = JSON.stringify(clientValues)
                 const actionsLogs = {
                     ...actionLogs,
                     actionType: "update",
                     entity: "clients",
                     oldData: {
-                        oldData: JSON.stringify(oldClientJson)
+                        oldDataSerialized
                     },
                     details: `${actionLogs.userName} editó los datos del cliente ${capitaliceStrings(oldClient.nombre_completo)}`,
                     newData: {
-                        newData: JSON.stringify(clientValues)
+                        newDataSerialized
                     },
                     day: dayjs().format("YYYY-MM-DD"),
                     time: dayjs().format("HH:mm:ss")
@@ -658,13 +659,13 @@ export const AppContextProvider = ({ children }) => {
 
                 throw new Error(`${data.message}`);
             }
-
+            const newDataSerialized = JSON.stringify(processedDebts)
             const actionsLogs = {
                 ...actionLogs,
                 actionType: "create",
                 entity: "debts",
                 oldData: {},
-                newData: { newData: JSON.stringify(processedDebts) },
+                newData: { newDataSerialized },
                 details: `${actionLogs.userName} creó una deuda para el cliente ${clients.find(client => client.id === clientId).nombre_completo}`,
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
@@ -697,6 +698,10 @@ export const AppContextProvider = ({ children }) => {
         const formData = new FormData()
         const hiddenMessage = message.loading("Guardando entrega...", 0)
         formData.append("deliversData", JSON.stringify([deliverData]) ?? "")
+        const newDeliver = {
+            monto: deliverData.deliverAmount,
+            fecha: deliverData.deliverDate
+        }
         try {
             const response = await fetch(`${baseUrl.api}/save-client-deliver/${clientId}`, {
                 method: "POST",
@@ -707,13 +712,15 @@ export const AppContextProvider = ({ children }) => {
             if (!response.ok) {
                 throw new Error(data.message || "No fue posible guardar la entrega");
             }
+            const newDataSerialized = JSON.stringify(newDeliver)
             const actionsLogs = {
                 ...actionLogs,
                 actionType: "create",
                 entity: "delivers",
-                oldData: {},
+                
                 details: `${actionLogs.userName} recibió una entrega del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
-                newData: { newData: JSON.stringify(deliverData) },
+                newData: { newDataSerialized },
+                oldData: {},
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
 
@@ -761,15 +768,17 @@ export const AppContextProvider = ({ children }) => {
             if (!response.ok) {
                 throw new Error(data.message || "No fue posible guardar la entrega");
             }
+            const newDataSerialized = JSON.stringify(newDeliver)
+            const oldDataSerialized = JSON.stringify(oldDeliverInfo)
             const actionsLogs = {
                 ...actionLogs,
                 actionType: "update",
                 entity: "delivers",
                 oldData: {
-                    oldData: JSON.stringify(oldDeliverInfo)
+                    oldDataSerialized
                 },
                 newData: {
-                    newData: JSON.stringify(newDeliver)
+                    newDataSerialized 
                 },
                 details: `${actionLogs.userName} editó una entrega del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
                 day: dayjs().format("YYYY-MM-DD"),
@@ -809,16 +818,16 @@ export const AppContextProvider = ({ children }) => {
             if (!response.ok) {
                 throw new Error(data.message)
             }
-
+            const oldDataSerialized = JSON.stringify(oldDeliverInfo)
             const actionsLogs = {
                 ...actionLogs,
                 actionType: "delete",
                 entity: "delivers",
                 oldData: {
-                    oldData: JSON.stringify(oldDeliverInfo)
+                    oldDataSerialized
                 },
-                details: `${actionLogs.userName} eliminó una entrega del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
                 newData: {},
+                details: `${actionLogs.userName} eliminó una entrega del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
             }
@@ -878,17 +887,19 @@ export const AppContextProvider = ({ children }) => {
             const data = await response.json()
             if (!response.ok) throw new Error(data.message || "No fue posible guardar el producto");
 
+            const newDataSerialized = JSON.stringify(processedDebt)
+            const oldDataSerialized = JSON.stringify(oldDebt)
             const actionsLogs = {
                 ...actionLogs,
                 actionType: "update",
                 entity: "debts",
                 oldData: {
-                    oldData: JSON.stringify(oldDebt)
+                    oldDataSerialized
+                },
+                newData: {
+                    newDataSerialized
                 },
                 details: `${actionLogs.userName} editó una deuda del cliente ${clients.find(client => client.id === clientId).nombre_completo}`,
-                newData: {
-                    newData: JSON.stringify(processedDebt)
-                },
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
 
@@ -929,16 +940,16 @@ export const AppContextProvider = ({ children }) => {
 
             const data = response.json()
             if (!response.ok) throw new Error(data.message || "No fue posible eliminar la deuda");
-
+            const oldDataSerialized = JSON.stringify(oldDebtInfo)
             const actionsLogs = {
                 ...actionLogs,
                 actionType: "delete",
                 entity: "debts",
                 oldData: {
-                    oldData: JSON.stringify(oldDebtInfo)
+                    oldDataSerialized
                 },
-                details: `${actionLogs.userName} Eliminó una deuda del cliente ${clients.find(client => client.id === clientId).nombre_completo}`,
                 newData: {},
+                details: `${actionLogs.userName} Eliminó una deuda del cliente ${clients.find(client => client.id === clientId).nombre_completo}`,
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
     
@@ -996,10 +1007,7 @@ export const AppContextProvider = ({ children }) => {
                 ...actionLogs,
                 actionType: "insert",
                 entity: "history_client",
-                oldData: {
-                    oldDebts: JSON.stringify(processedOldDebts),
-                    oldDelivers: JSON.stringify(processedOldDelivers)
-                },
+                oldData: {},
                 details: `${actionLogs.userName} Canceló una deuda del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
                 newData: {},
                 day: dayjs().format("YYYY-MM-DD"),
