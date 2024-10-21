@@ -37,7 +37,7 @@ function AddDebt({ clientId, editingDebt = false, selectedDebt = {}, closeModal 
         const { productName } = values
 
         const products = productName.trim().split("\n")
-        const regex = /^\d+ [a-zA-Z0-9\s]+ \d+(\.\d{2})?$/
+        const regex = /^\d+ [a-zA-Z0-9áéíóúüñÁÉÍÓÚÜÑ\s.]+ \d+(\.\d{2})?$/;
 
         for (let product of products) {
             if (!regex.test(product.trim())) {
