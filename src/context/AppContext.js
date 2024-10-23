@@ -1022,7 +1022,7 @@ export const AppContextProvider = ({ children }) => {
 
     const saveBranch = async (businessName) => {
         const hiddenMessage = message.loading("Guardando...", 0)
-        
+
         try {
             const response = await fetch(`${baseUrl.api}/save-branch`, {
                 method: "POST",
@@ -1035,6 +1035,19 @@ export const AppContextProvider = ({ children }) => {
             const data = await response.json()
 
             if (response.status !== 200) throw new Error(data.message ?? "No se pudo guardar la nueva sucursal")
+
+            const actionsLogs = {
+                ...actionLogs,
+                actionType: "insert",
+                entity: "branches",
+                oldData: {},
+                details: `${actionLogs.userName} creó una nueva sucursal: "${capitaliceStrings(businessName)}"`,
+                newData: {},
+                day: dayjs().format("YYYY-MM-DD"),
+                time: dayjs().format("HH:mm:ss")
+
+            }
+            await sendActionsLogs(actionsLogs)
 
             notification.success({
                 message: "Sucursal guardada!",
@@ -1051,6 +1064,62 @@ export const AppContextProvider = ({ children }) => {
             });
         } finally {
             hiddenMessage()
+        }
+    };
+
+    const editBranchName = async (branchId, branchName, oldBranch) => {
+        if (!branchName || !branchId) {
+            notification.error({
+                message: "Se requiere el ID de la sucursal y un nombre.",
+                duration: 2
+            })
+
+            return;
+        }
+
+        const oldDataSerialized = JSON.stringify(oldBranch);
+        const newDataSerialized = JSON.stringify(branchName)
+        try {
+            const result = await fetch(`${baseUrl.api}/edit-branch-name`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ branchId, branchName })
+            });
+
+            const data = result.json()
+
+            if (result.status !== 200) throw new Error(data.message || "No se pudo actualizar el nombre de la sucursal, intente nuevamente.")
+
+            const actionsLogs = {
+                ...actionLogs,
+                actionType: "insert",
+                entity: "branches",
+                oldData: {
+                    oldDataSerialized
+                },
+                details: `${actionLogs.userName} editó la sucursal "${capitaliceStrings(oldBranch)}" a: "${capitaliceStrings(branchName)}"`,
+                newData: {
+                    newDataSerialized
+                },
+                day: dayjs().format("YYYY-MM-DD"),
+                time: dayjs().format("HH:mm:ss")
+
+            }
+            await sendActionsLogs(actionsLogs)
+
+            notification.success({
+                message: "Actualización exitosa!",
+                description: data.message || "Se actualizó el nombre de la sucursal"
+            });
+        } catch (error) {
+            console.log(error)
+            notification.error({
+                message: "Error en el servidor o de conexión al actualizar la sucursal.",
+                duration: 4,
+                showProgress: true
+            })
         }
     }
 
@@ -1086,7 +1155,7 @@ export const AppContextProvider = ({ children }) => {
             getClientFile, client, processDebts, processedDebts,
             saveClientDeliver, processDelivers, editDeliver,
             deleteDeliver, editDebt, deleteDebt, cancelDebts,
-            saveBranch
+            saveBranch, editBranchName
         }}
         >
             {contextHolder}
