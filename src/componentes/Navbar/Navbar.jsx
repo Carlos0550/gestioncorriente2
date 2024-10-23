@@ -46,7 +46,7 @@ function Navbar() {
                         <li className={location.pathname === "/reports" ? 'nav-pc__li active' : 'nav-pc__li'} onClick={()=> navigate("/reports")}>Reportes</li>
                     )}
                     {currentUser?.administrador && (
-                        <li className='nav-pc__li'>Ajustes</li>
+                        <li className={location.pathname === "/settings" ? 'nav-pc__li active' : 'nav-pc__li'} onClick={()=> navigate("/settings")}>Ajustes</li>
                     )}
                 </ul>
             </nav>
