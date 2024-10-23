@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Row, Col, Table, Card, Popconfirm } from "antd"
+import { Row, Col, Table, Card, Popconfirm, message, Skeleton } from "antd"
 import "./dashboard.css"
 import Navbar from '../Navbar/Navbar'
 import { useNavigate } from 'react-router-dom'
@@ -29,77 +29,84 @@ function Dashboard() {
 
     const [expirations, setExpirations] = useState([])
     const [recentlyPays, setRecentlyPays] = useState([])
-
+    const [fetching, setFetching] = useState(false)
     const alreadyFetch = useRef(false)
     useEffect(() => {
         if (!alreadyFetch.current) {
             (async () => {
                 alreadyFetch.current = true
+                setFetching(true)
                 try {
                     const response = await fetch(`${baseUrl.api}/get-dashboard-data`)
                     const data = await response.json()
+                    console.log(data)
                     if (response.status === 200) {
                         setExpirations(data.vencimientos)
                         setRecentlyPays(data.pagos)
                     }
                 } catch (error) {
                     console.log(error)
+                }finally{
+                    setFetching(false)
                 }
             })()
         }
     }, [])
 
-    const alreadyProcessed = useRef(false)
+    const [expirationsInfo, setExpirationsInfo] = useState([]);
+    const [recentlyPaysInfo, setRecentlyPaysInfo] = useState([])
     useEffect(() => {
-        if (!alreadyProcessed.current) {
-            if (expirations && expirations.length > 0) {
-                alreadyProcessed.current = true
-                const updatedExpirations = [...expirations];
+        if (expirations && expirations.length > 0) {
+            const updatedExpirations = [...expirations];
 
-                for (let i = 0; i < updatedExpirations.length; i++) {
-                    const expi = updatedExpirations[i];
-                    const client = clients.find(client => client.id === expi.cliente_id);
-                    
-                    if (client) {
-                        updatedExpirations[i] = {
-                            clientName: capitaliceStrings(client.nombre_completo),
-                            vencimiento: expi.fecha_vencimiento
-                        };
-                    } else {
-                        updatedExpirations[i] = {
-                            clientName: "Cliente no existente",
-                            vencimiento: expi.fecha_vencimiento
-                        };
-                    }
+            for (let i = 0; i < updatedExpirations.length; i++) {
+                const expi = updatedExpirations[i];
+                const client = clients.find(client => client?.id === expi?.cliente_id);
+                console.log(client)
+                if (client) {
+                    updatedExpirations[i] = {
+                        clientName: capitaliceStrings(client?.nombre_completo),
+                        vencimiento: expi.fecha_vencimiento
+                    };
+                } else {
+                    updatedExpirations[i] = {
+                        clientName: "Cliente no existente",
+                        vencimiento: expi?.fecha_vencimiento
+                    };
                 }
-                const updatedPays = [...recentlyPays]
-
-                if (recentlyPays && recentlyPays.length > 0) {
-                    for (let i = 0; i < updatedPays.length; i++) {
-                        const pays = updatedPays[i];
-                        console.log(pays)
-                        const client = clients.find(client => client.id === pays.id_entrega_cliente)
-
-                        if (client) {
-                            updatedPays[i] = {
-                                clientName: capitaliceStrings(client.nombre_completo),
-                                deliverAmount: parseFloat(pays.detalle_entrega[0].deliverAmount)
-                            }
-                        }else{
-                            updatedPays[i] = {
-                                clientName: "Cliente no encontrado",
-                                deliverAmount: parseFloat(pays.detalle_entrega[0].deliverAmount)
-                            }
-                        }
-
-                        
-                    }
-                }
-                setRecentlyPays(updatedPays)
-                setExpirations(updatedExpirations);
             }
+
+            setExpirationsInfo(updatedExpirations);
         }
+
+        if (recentlyPays && recentlyPays.length > 0) {
+            const updatedPays = [...recentlyPays]
+
+            for (let i = 0; i < updatedPays.length; i++) {
+                const pays = updatedPays[i];
+                const client = clients?.find(client => client?.id === pays?.id_entrega_cliente)
+
+                if (client) {
+                    updatedPays[i] = {
+                        clientName: capitaliceStrings(client?.nombre_completo),
+                        deliverAmount: parseFloat(pays?.detalle_entrega[0].deliverAmount)
+                    }
+                } else {
+                    updatedPays[i] = {
+                        clientName: "Cliente no encontrado",
+                        deliverAmount: parseFloat(pays?.detalle_entrega[0].deliverAmount)
+                    }
+                }
+            }
+            setRecentlyPaysInfo(updatedPays)
+        }
+
     }, [expirations, recentlyPays]);
+
+    // useEffect(() => {
+    //     console.log("RecentlyInfo: ", recentlyPaysInfo)
+    //     console.log("ExpirationsInfo: ", expirationsInfo)
+    // }, [expirationsInfo, recentlyPaysInfo])
 
     const usersStructureTable = [
 
@@ -175,7 +182,7 @@ function Dashboard() {
         {
             key: "1",
             title: "Cliente",
-            render: (_,record) => (
+            render: (_, record) => (
                 <>
                     <strong>{record.clientName}</strong>
                 </>
@@ -184,9 +191,9 @@ function Dashboard() {
         {
             key: "2",
             title: "Monto",
-            render: (_,record) => (
+            render: (_, record) => (
                 <>
-                    {record.deliverAmount?.toLocaleString("es-AR",{style: "currency", currency: "ARS"})}
+                    {record.deliverAmount?.toLocaleString("es-AR", { style: "currency", currency: "ARS" })}
                 </>
             )
         }
@@ -197,15 +204,15 @@ function Dashboard() {
         {
             key: "1",
             title: "Cliente",
-            render:(_,record) => (
+            render: (_, record) => (
                 <>
                     <strong>{record.clientName}</strong>
                 </>
             )
-        },{
+        }, {
             key: "2",
             title: "Vencimiento",
-            render: (_,record) => (
+            render: (_, record) => (
                 <>
                     {dayjs(record?.vencimiento).format("DD/MM/YYYY")}
                 </>
@@ -222,17 +229,21 @@ function Dashboard() {
                     <Row gutter={[16, 16]}>
                         <Col sx={24} sm={24} md={24} lg={24}>
                             <Card title="Usuarios con acceso">
-                                <Table columns={usersStructureTable} dataSource={orderedUsers} style={{ minWidth: "100%" }} pagination={{ pageSize: 5 }} scroll={{ x: 800 }} />
+                                {fetching ? <Skeleton active/> : (
+                                    <Table columns={usersStructureTable} dataSource={orderedUsers} style={{ minWidth: "100%" }} pagination={{ pageSize: 5 }} scroll={{ x: 800 }} />
+                                )}
                             </Card>
                         </Col>
                         <Col sx={24} sm={24} md={12} lg={12}>
                             <Card title="Pagos recientes (de este mes)">
-                                <Table columns={recentlyPaysTable} scroll={{ x: 800 }} style={{ minWidth: "100%" }} pagination={{ pageSize: 5 }} dataSource={recentlyPays} />
+                                {fetching ? <Skeleton active/> : (
+                                    <Table columns={recentlyPaysTable} scroll={{ x: 800 }} style={{ minWidth: "100%" }} pagination={{ pageSize: 5 }} dataSource={recentlyPaysInfo} />
+                                )}
                             </Card>
                         </Col>
                         <Col sx={24} sm={24} md={12} lg={12}>
                             <Card title="Próximos vencimientos (de este mes)">
-                                <Table columns={expirationsTable} scroll={{ x: 800 }} style={{ minWidth: "100%" }} pagination={{ pageSize: 4 }} dataSource={expirations}/>
+                                <Table columns={expirationsTable} scroll={{ x: 800 }} style={{ minWidth: "100%" }} pagination={{ pageSize: 4 }} dataSource={expirationsInfo} />
                             </Card>
                         </Col>
 
