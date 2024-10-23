@@ -717,7 +717,7 @@ export const AppContextProvider = ({ children }) => {
                 ...actionLogs,
                 actionType: "create",
                 entity: "delivers",
-                
+
                 details: `${actionLogs.userName} recibió una entrega del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
                 newData: { newDataSerialized },
                 oldData: {},
@@ -778,7 +778,7 @@ export const AppContextProvider = ({ children }) => {
                     oldDataSerialized
                 },
                 newData: {
-                    newDataSerialized 
+                    newDataSerialized
                 },
                 details: `${actionLogs.userName} editó una entrega del cliente ${capitaliceStrings(clients.find(client => client.id === clientId).nombre_completo)}`,
                 day: dayjs().format("YYYY-MM-DD"),
@@ -952,7 +952,7 @@ export const AppContextProvider = ({ children }) => {
                 details: `${actionLogs.userName} Eliminó una deuda del cliente ${clients.find(client => client.id === clientId).nombre_completo}`,
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
-    
+
             }
             await sendActionsLogs(actionsLogs)
 
@@ -978,22 +978,6 @@ export const AppContextProvider = ({ children }) => {
 
     const cancelDebts = async (clientId) => {
         const hiddenMessage = message.loading("Cancelando...", 0)
-        const oldDebts = processedDebts.filter(debt => debt.clienteId === clientId)
-        const oldDelivers = processDelivers().filter(delivers => delivers.id_cliente === clientId)
-        const processedOldDelivers = oldDelivers.map((deliver) => {
-            return {
-                deliver: deliver.monto,
-                fecha: deliver.fecha
-            }
-        })
-
-        const processedOldDebts = oldDebts.map((debts) => {
-            const productos = debts.productos
-            return {
-                fechaCompra: debts.fechaCompra,
-                productos
-            }
-        })
 
         try {
             const response = await fetch(`${baseUrl.api}/cancel-client-debts/${clientId}`, {
@@ -1036,6 +1020,40 @@ export const AppContextProvider = ({ children }) => {
         }
     }
 
+    const saveBranch = async (businessName) => {
+        const hiddenMessage = message.loading("Guardando...", 0)
+        
+        try {
+            const response = await fetch(`${baseUrl.api}/save-branch`, {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'text/plain'
+                },
+                body: businessName
+            });
+
+            const data = await response.json()
+
+            if (response.status !== 200) throw new Error(data.message ?? "No se pudo guardar la nueva sucursal")
+
+            notification.success({
+                message: "Sucursal guardada!",
+                duration: 2,
+                showProgress: true
+            })
+        } catch (error) {
+            console.log(error)
+            notification.error({
+                message: "Error guardando la sucursal.",
+                description: error.message || "Error de conexión o de servidor",
+                duration: 4,
+                showProgress: true
+            });
+        } finally {
+            hiddenMessage()
+        }
+    }
+
     useEffect(() => {
         if (user) {
             (async () => {
@@ -1067,7 +1085,8 @@ export const AppContextProvider = ({ children }) => {
             orderedClients, capitaliceStrings, uuidv4, saveClientDebt,
             getClientFile, client, processDebts, processedDebts,
             saveClientDeliver, processDelivers, editDeliver,
-            deleteDeliver, editDebt, deleteDebt, cancelDebts
+            deleteDeliver, editDebt, deleteDebt, cancelDebts,
+            saveBranch
         }}
         >
             {contextHolder}
