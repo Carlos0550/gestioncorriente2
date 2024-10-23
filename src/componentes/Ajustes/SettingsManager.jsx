@@ -1,15 +1,21 @@
 import React, { useState } from 'react'
 import Navbar from '../Navbar/Navbar'
-import { Card, Form, Table, Input, Row, Col, Collapse, Button } from 'antd'
+import { Card, Form, Table, Input, Row, Col, Collapse, Button, message } from 'antd'
+import { useAppContext } from '../../context/AppContext';
 
 const { Panel } = Collapse;
 
 function SettingsManager() {
     const [form] = Form.useForm();
     const [activeKey, setActiveKey] = useState(null);
+    const { saveBranch } = useAppContext()
 
-    const onFinish = (values) => {
-        console.log(values);
+    const onFinish = async(values) => {
+        const { businessName } = values
+        if (!businessName) return message.error("Se necesita un nombre de sucursal/negocio!")
+        await saveBranch(businessName)
+        form.resetFields()
+        
     }
 
     const settingTable = [
