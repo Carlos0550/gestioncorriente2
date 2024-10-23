@@ -8,6 +8,7 @@ import ClientsManager from './componentes/AdministrarClientes/ClientsManager';
 import CurrentAccManager from './componentes/Cuentas Corrientes/CurrentAccManager';
 import ExpirationsManager from './componentes/Vencimientos/ExpirationsManager';
 import ReportsManager from './componentes/Reportes/ReportsManager';
+import SettingsManager from './componentes/Ajustes/SettingsManager';
 
 function App() {
   return (
@@ -54,6 +55,15 @@ function App() {
         element={
           <SignedIn>
             <ReportsManager />
+          </SignedIn>
+        }
+      />
+
+      <Route
+        path='/settings'
+        element={
+          <SignedIn>
+            <SettingsManager />
           </SignedIn>
         }
       />
