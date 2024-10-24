@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Navbar from '../Navbar/Navbar'
-import { Card, Form, Table, Input, Row, Col, Collapse, Button, message, notification, Space } from 'antd'
+import { Card, Form, Table, Input, Row, Col, Collapse, Button, message, notification, Space, Popconfirm } from 'antd'
 import { useAppContext } from '../../context/AppContext';
 import AddBranches from './Añadir Sucursales/AddBranches';
 import { baseUrl } from '../../config';
@@ -10,34 +10,21 @@ const { Panel } = Collapse;
 
 function SettingsManager() {
     const [activeKey, setActiveKey] = useState(null);
-    const [sucursales, setSucursales] = useState([])
+    const { getBranches, sucursales, deleteBranch } = useAppContext()
 
     const alreadyFetch = useRef(false)
     useEffect(() => {
         if (!alreadyFetch.current) {
             (async () => {
                 alreadyFetch.current = true
-
-                try {
-                    const response = await fetch(`${baseUrl.api}/get-branches`)
-                    const data = await response.json()
-                    console.log(data)
-                    if(response.status !== 200) throw new Error("Error al obtener las sucursales")
-                    setSucursales(data.sucursales)
-                } catch (error) {
-                    console.log(error)
-                    notification.error({
-                        message: error.message,
-                        duration: 3,
-                        showProgress: true
-                    })
-                }
+                getBranches()
             })()
         }
     }, [])
 
     const [selectedBranch, setSelectedBranch] = useState({})
     const [isEditingBranch, setIsEditingBranch] = useState(false)
+    
     const handleEditBranch = (branchId) => {
         setSelectedBranch(sucursales.find(sucursal => sucursal.id === branchId))
         setIsEditingBranch(true)
@@ -46,6 +33,14 @@ function SettingsManager() {
     const handleCancelEditBranch = () =>{
         setIsEditingBranch(false)
         setSelectedBranch({})
+    }
+
+    const [deleting, setDeleting] = useState(false)
+    const handleDeleteBranch = async(branchID) => {
+        const branchName = sucursales.find(sucursal => sucursal.id === branchID).business_name;
+        setDeleting(true)
+        await deleteBranch(branchID, branchName);
+        setDeleting(false)
     }
 
     const settingTable = [
@@ -62,7 +57,17 @@ function SettingsManager() {
                 <>
                     <Space direction='vertical'>
                         <Button icon={<EditOutlined/>} type='primary' onClick={()=> handleEditBranch(record.id)}></Button>
-                        <Button icon={<DeleteOutlined/>} type='primary' danger></Button>
+                        <Popconfirm
+                        title="¿Seguro que desea eliminar esta sucursal?"
+                        okText="Si, eliminar"
+                        cancelText= "No"
+                        onConfirm={()=> handleDeleteBranch(record.id)}
+                        okButtonProps={[
+                            {loading: deleting}
+                        ]}
+                        >
+                            <Button icon={<DeleteOutlined/>} type='primary' danger></Button>
+                        </Popconfirm>
                     </Space>
                 </>
             )
@@ -85,7 +90,7 @@ function SettingsManager() {
                                     <Table
                                         columns={settingTable}
                                         dataSource={sucursales}
-                                        pagination={{pageSize: 5}}
+                                        pagination={{pageSize: 3}}
                                         scroll={{ x: '100%' }}
                                         
                                     />
