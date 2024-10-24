@@ -204,7 +204,7 @@ function ReportsManager() {
       <Navbar />
       <h1 className='title'>Reportes</h1>
       <div className="container-wrapper">
-        <Table columns={tableStructure} dataSource={reportes} />
+        <Table columns={tableStructure}  />
       </div>
     </>
   );
