@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Row, Col, Table, Card, Popconfirm, message, Skeleton } from "antd"
+import { Row, Col, Table, Card, Popconfirm, message, Skeleton, Select, Typography } from "antd"
 import "./dashboard.css"
 import Navbar from '../Navbar/Navbar'
 import { useNavigate } from 'react-router-dom'
@@ -8,10 +8,23 @@ import { Button, Space, Switch } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
 import { baseUrl } from '../../config'
 import dayjs from "dayjs"
+
+const { Option } = Select
+const { Text } = Typography
 function Dashboard() {
 
     const navigate = useNavigate()
-    const { listaUsuarios, deleteUser, grantOrDenyAccess, currentUser, clients, capitaliceStrings } = useAppContext()
+    const { 
+        listaUsuarios, 
+        deleteUser, 
+        grantOrDenyAccess, 
+        currentUser, 
+        clients, 
+        capitaliceStrings, 
+        sucursales,
+        getBranches,
+        changeBranchUser
+    } = useAppContext()
     const orderedUsers = listaUsuarios
         .sort((a, b) => a.id - b.id)
     const [deletingUser, setDeletingUser] = useState(false)
@@ -38,21 +51,21 @@ function Dashboard() {
                 setFetching(true)
                 try {
                     const response = await fetch(`${baseUrl.api}/get-dashboard-data`)
+                    getBranches()
                     const data = await response.json()
-                    console.log(data)
                     if (response.status === 200) {
                         setExpirations(data.vencimientos)
                         setRecentlyPays(data.pagos)
                     }
                 } catch (error) {
                     console.log(error)
-                }finally{
+                } finally {
                     setFetching(false)
                 }
             })()
         }
     }, [])
-
+    
     const [expirationsInfo, setExpirationsInfo] = useState([]);
     const [recentlyPaysInfo, setRecentlyPaysInfo] = useState([])
     useEffect(() => {
@@ -103,10 +116,11 @@ function Dashboard() {
 
     }, [expirations, recentlyPays]);
 
-    // useEffect(() => {
-    //     console.log("RecentlyInfo: ", recentlyPaysInfo)
-    //     console.log("ExpirationsInfo: ", expirationsInfo)
-    // }, [expirationsInfo, recentlyPaysInfo])
+    const toggleBranchUser = async(branchId, userId) => {
+        const branchName = sucursales.find(sucursal => sucursal?.id === branchId)?.business_name;
+        const oldBranchName = sucursales.find(sucursal => sucursal?.id === userId)?.business_name ?? "N/A"
+        await changeBranchUser(branchId,userId, branchName, oldBranchName )
+    }
 
     const usersStructureTable = [
 
@@ -151,8 +165,20 @@ function Dashboard() {
             render: (_, record) => (
                 <picture className="user__image-container"><img src={record.userimage} alt="" /></picture>
             )
-        }, {
+        },
+        {
             key: 4,
+            title: "Sucursal asignada",
+            render: (_,record) => (
+                <>
+                    <strong>{sucursales.find(
+                        (sucursal)=> sucursal?.id === record?.id_punto_venta 
+                    )?.business_name ?? "N/A"}</strong>
+                </>
+            )
+        },
+        {
+            key: 5,
             title: "Acciones",
             render: (_, record) => (
                 <>
@@ -173,6 +199,16 @@ function Dashboard() {
                             </Popconfirm>
                         </Space>
                     )}
+
+                    {record.administrador ? (
+                        <>
+                        <Text>Cambiar/asignar sucursal</Text>
+                        <Select onChange={(id)=> toggleBranchUser(id, record.userid)} placeholder="Seleccione una sucursal" style={{ width: '100%' }} value={record?.id_punto_venta}>
+                            {sucursales && sucursales.map((branch) => (
+                                <Option key={branch.id} value={branch.id}>{branch?.business_name}</Option>
+                            ))}
+                        </Select>
+                        </>) : null}
                 </>
             )
         }
@@ -229,14 +265,14 @@ function Dashboard() {
                     <Row gutter={[16, 16]}>
                         <Col sx={24} sm={24} md={24} lg={24}>
                             <Card title="Usuarios con acceso">
-                                {fetching ? <Skeleton active/> : (
+                                {fetching ? <Skeleton active /> : (
                                     <Table columns={usersStructureTable} dataSource={orderedUsers} style={{ minWidth: "100%" }} pagination={{ pageSize: 5 }} scroll={{ x: 800 }} />
                                 )}
                             </Card>
                         </Col>
                         <Col sx={24} sm={24} md={12} lg={12}>
                             <Card title="Pagos recientes (de este mes)">
-                                {fetching ? <Skeleton active/> : (
+                                {fetching ? <Skeleton active /> : (
                                     <Table columns={recentlyPaysTable} scroll={{ x: 800 }} style={{ minWidth: "100%" }} pagination={{ pageSize: 5 }} dataSource={recentlyPaysInfo} />
                                 )}
                             </Card>
