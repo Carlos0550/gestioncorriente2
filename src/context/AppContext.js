@@ -1020,6 +1020,30 @@ export const AppContextProvider = ({ children }) => {
         }
     }
 
+    const [sucursales, setSucursales] = useState([])
+    const getBranches = async() => {
+        const hiddenMessage = message.loading("Un segundo...",0)
+        try {
+            const response = await fetch(`${baseUrl.api}/get-branches`)
+            const data = await response.json()
+            if(response.status !== 200) {
+                setSucursales([])
+                throw new Error(data.message || "Error al obtener las sucursales")
+            }
+            setSucursales(data.sucursales)
+        } catch (error) {
+            console.log(error)
+            notification.error({
+                message: error.message,
+                duration: 3,
+                showProgress: true
+            })
+        }finally{
+            hiddenMessage()
+        }
+    }
+
+
     const saveBranch = async (businessName) => {
         const hiddenMessage = message.loading("Guardando...", 0)
 
@@ -1048,6 +1072,7 @@ export const AppContextProvider = ({ children }) => {
 
             }
             await sendActionsLogs(actionsLogs)
+            await getBranches()
 
             notification.success({
                 message: "Sucursal guardada!",
@@ -1076,9 +1101,6 @@ export const AppContextProvider = ({ children }) => {
 
             return;
         }
-
-        const oldDataSerialized = JSON.stringify(oldBranch);
-        const newDataSerialized = JSON.stringify(branchName)
         try {
             const result = await fetch(`${baseUrl.api}/edit-branch-name`, {
                 method: "PUT",
@@ -1094,20 +1116,21 @@ export const AppContextProvider = ({ children }) => {
 
             const actionsLogs = {
                 ...actionLogs,
-                actionType: "insert",
+                actionType: "update",
                 entity: "branches",
                 oldData: {
-                    oldDataSerialized
+                    
                 },
                 details: `${actionLogs.userName} editó la sucursal "${capitaliceStrings(oldBranch)}" a: "${capitaliceStrings(branchName)}"`,
                 newData: {
-                    newDataSerialized
+                    
                 },
                 day: dayjs().format("YYYY-MM-DD"),
                 time: dayjs().format("HH:mm:ss")
 
             }
             await sendActionsLogs(actionsLogs)
+            await getBranches()
 
             notification.success({
                 message: "Actualización exitosa!",
@@ -1120,6 +1143,101 @@ export const AppContextProvider = ({ children }) => {
                 duration: 4,
                 showProgress: true
             })
+        }
+    };
+
+    const deleteBranch = async (branchId, businessName) => {
+        if (!branchId || !businessName) {
+            notification.error({
+                message: "Uno o más datos están faltando para eliminar la sucursal.",
+                duration: 2,
+                showProgress: true
+            });
+            return;
+        }
+    
+        try {
+            const response = await fetch(`${baseUrl.api}/delete-branch/${branchId}`, {
+                method: "DELETE"
+            });
+    
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Intente nuevamente.");
+            }
+    
+            const actionsLogs = {
+                ...actionLogs,
+                actionType: "delete", 
+                entity: "branches",
+                oldData: {}, 
+                details: `${actionLogs.userName} eliminó una sucursal: "${capitaliceStrings(businessName)}"`,
+                newData: {},
+                day: dayjs().format("YYYY-MM-DD"),
+                time: dayjs().format("HH:mm:ss")
+            };
+            
+            await sendActionsLogs(actionsLogs);
+    
+            notification.success({
+                message: "Sucursal eliminada!",
+                duration: 2,
+                showProgress: true
+            });
+        } catch (error) {
+            console.log(error);
+            notification.error({
+                message: "Hubo un problema al eliminar la Sucursal.",
+                description: error.message || "Error de conexión o de servidor.",
+                duration: 3,
+                showProgress: true
+            });
+        }finally{
+            await getBranches();
+        }
+    };
+    const changeBranchUser = async(branchId, userId, branchName, oldBranchName) => {
+        const hiddenMessage = message.loading("Un segundo...",0)
+        const userName = listaUsuarios.find(usr => usr.userid === userId)?.username
+        
+        try {
+            const response = await fetch(`${baseUrl.api}/change-branch-user/${branchId}?userId=${userId}`,{
+                method: "PUT",
+            });
+
+            if(!response.ok){
+                const errorMessage = response.json()?.message
+                throw new Error(errorMessage || "Error al intentar asignar una sucursal al usuario.")
+            }
+
+            const actionsLogs = {
+                ...actionLogs,
+                actionType: "update", 
+                entity: "usuarios",
+                oldData: {oldBranchName}, 
+                details: `${actionLogs.userName} asignó la sucursal ${branchName} al usuario: "${capitaliceStrings(userName)}"`,
+                newData: {},
+                day: dayjs().format("YYYY-MM-DD"),
+                time: dayjs().format("HH:mm:ss")
+            };
+            
+            await sendActionsLogs(actionsLogs);
+
+            notification.success({
+                message: "Sucursal asignada!",
+                duration: 1
+            })
+            await getAllAllowUsers()
+        } catch (error) {
+            console.log(error)
+            notification.error({
+                message: "Error al asignar la sucursal",
+                description: error.message || "Error de conexión o en el servidor, intente nuevamente",
+                duration: 4,
+                showProgress: true
+            })
+        }finally{
+            hiddenMessage()
         }
     }
 
@@ -1155,7 +1273,8 @@ export const AppContextProvider = ({ children }) => {
             getClientFile, client, processDebts, processedDebts,
             saveClientDeliver, processDelivers, editDeliver,
             deleteDeliver, editDebt, deleteDebt, cancelDebts,
-            saveBranch, editBranchName
+            saveBranch, editBranchName, sucursales, getBranches,
+            deleteBranch, changeBranchUser
         }}
         >
             {contextHolder}
